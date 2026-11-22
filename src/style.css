@@ -107,7 +107,7 @@ select option {
 }
 
 .seg-btn {
-  @apply px-2 py-1 rounded-lg text-[11px] font-bold text-slate-400 transition;
+  @apply px-2 py-1 rounded-lg text-[12px] font-bold text-slate-400 transition;
 }
 .seg-btn:hover {
   @apply text-white;
@@ -149,4 +149,47 @@ select.project-select {
   --tw-shadow: 0 0 #0000;
   --tw-shadow-colored: 0 0 #0000;
   box-shadow: none;
+}
+
+/* Roomier form fields (the compact hour inputs in the weekly table stay small). */
+input.rounded-xl,
+select.rounded-xl {
+  padding-top: 0.625rem;
+  padding-bottom: 0.625rem;
+}
+input.rounded-lg:not([type='number']) {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+select.project-select {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  font-size: 0.8125rem;
+}
+
+/* Active tab keeps white text in both themes. */
+.nav-btn.is-active,
+.nav-btn.is-active:hover {
+  color: #ffffff;
+}
+
+/* Weekly hours: the PDF always uses the full table, also on phones. */
+.pdf-mode #bauMobileList {
+  display: none !important;
+}
+.pdf-mode .bau-table-wrap {
+  display: block !important;
+}
+details > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* Phones: modals scroll as a whole, tables keep their own scroll. */
+@media (max-width: 639px) {
+  #signatureModal > div,
+  #editCredentialsModal > div,
+  #confirmModal > div,
+  #kundeLangModal > div {
+    padding: 1.25rem;
+  }
 }

@@ -71,7 +71,7 @@ function renderSites() {
       const selected = site.id === view.siteId;
       const chips = members.length
         ? members
-            .map((m) => `<span class="text-[11px] px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-slate-200">${escapeHtml(m.name)}</span>`)
+            .map((m) => `<span class="text-[12px] px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-slate-200">${escapeHtml(m.name)}</span>`)
             .join('')
         : `<span class="text-xs text-slate-500 italic">${escapeHtml(t('admin.site.noMembers'))}</span>`;
 
@@ -82,7 +82,7 @@ function renderSites() {
         <div class="space-y-2">
           <div class="flex items-start justify-between gap-2">
             <div>
-              <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Baustelle</span>
+              <span class="text-[11px] font-bold uppercase tracking-wider text-emerald-400">Baustelle</span>
               <h3 class="text-base font-extrabold text-white">${escapeHtml(site.location)}</h3>
             </div>
             <button type="button" data-action="admin-delete-site" data-id="${escapeHtml(site.id)}" class="text-slate-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-slate-700 transition" title="${escapeHtml(t('admin.site.delete'))}">
@@ -92,7 +92,7 @@ function renderSites() {
           <p class="text-xs text-slate-300"><strong class="text-slate-400">${escapeHtml(t('admin.site.company'))}</strong> ${escapeHtml(site.company)}</p>
           <p class="text-xs text-indigo-300"><strong class="text-slate-400">${escapeHtml(t('role.baulajter'))}:</strong> ${leader ? escapeHtml(leader.name) : escapeHtml(t('admin.site.noLeader'))}</p>
           <div class="pt-2 border-t border-slate-700/70">
-            <p class="text-[11px] font-semibold text-slate-400 mb-1.5">${escapeHtml(t('admin.site.team', { n: members.length }))}</p>
+            <p class="text-[12px] font-semibold text-slate-400 mb-1.5">${escapeHtml(t('admin.site.team', { n: members.length }))}</p>
             <div class="flex flex-wrap gap-1">${chips}</div>
           </div>
         </div>
@@ -246,7 +246,7 @@ function renderSiteDetails() {
                     <td class="p-2.5 text-center font-bold text-slate-400">${i + 1}</td>
                     <td class="p-2.5 font-bold text-white">${escapeHtml(r.person.name)}</td>
                     <td class="p-2.5 text-center">
-                      <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${signed ? 'bg-emerald-950 text-emerald-300 border border-emerald-700' : 'bg-amber-950 text-amber-300 border border-amber-700'}">
+                      <span class="px-2 py-0.5 rounded-full text-[11px] font-bold ${signed ? 'bg-emerald-950 text-emerald-300 border border-emerald-700' : 'bg-amber-950 text-amber-300 border border-amber-700'}">
                         ${escapeHtml(signed ? t('admin.site.signed') : t('admin.site.unsigned'))}
                       </span>
                     </td>
@@ -289,11 +289,11 @@ function renderUsers() {
       const id = escapeHtml(user.id);
       const roleBtn =
         user.role === 'radnik'
-          ? `<button type="button" data-action="admin-toggle-role" data-id="${id}" class="px-2.5 py-1 bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-700 rounded-lg text-[11px] font-bold">${escapeHtml(t('admin.db.promote'))}</button>`
+          ? `<button type="button" data-action="admin-toggle-role" data-id="${id}" class="px-2.5 py-1 bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-700 rounded-lg text-[12px] font-bold">${escapeHtml(t('admin.db.promote'))}</button>`
           : user.role === 'baulajter'
-            ? `<button type="button" data-action="admin-toggle-role" data-id="${id}" class="px-2.5 py-1 bg-amber-950 hover:bg-amber-900 text-amber-300 border border-amber-700 rounded-lg text-[11px] font-bold">${escapeHtml(t('admin.db.demote'))}</button>`
+            ? `<button type="button" data-action="admin-toggle-role" data-id="${id}" class="px-2.5 py-1 bg-amber-950 hover:bg-amber-900 text-amber-300 border border-amber-700 rounded-lg text-[12px] font-bold">${escapeHtml(t('admin.db.demote'))}</button>`
             : '';
-      const editBtn = `<button type="button" data-action="admin-edit-cred" data-id="${id}" class="px-2.5 py-1 bg-indigo-950 hover:bg-indigo-900 text-indigo-300 border border-indigo-700 rounded-lg text-[11px] font-bold flex items-center gap-1" title="${escapeHtml(t('admin.db.editTitle'))}"><i class="fa-solid fa-key text-[10px]"></i> ${escapeHtml(t('admin.db.edit'))}</button>`;
+      const editBtn = `<button type="button" data-action="admin-edit-cred" data-id="${id}" class="px-2.5 py-1 bg-indigo-950 hover:bg-indigo-900 text-indigo-300 border border-indigo-700 rounded-lg text-[12px] font-bold flex items-center gap-1" title="${escapeHtml(t('admin.db.editTitle'))}"><i class="fa-solid fa-key text-[11px]"></i> ${escapeHtml(t('admin.db.edit'))}</button>`;
       const deleteBtn =
         user.id !== state.me.id
           ? `<button type="button" data-action="admin-delete-user" data-id="${id}" class="p-1.5 text-slate-400 hover:text-red-400 rounded-lg hover:bg-slate-700" title="${escapeHtml(t('common.delete'))}"><i class="fa-solid fa-trash-can"></i></button>`

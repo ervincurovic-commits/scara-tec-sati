@@ -101,13 +101,13 @@ function renderProjectsList() {
   const container = $('bauProjectsListContainer');
   const projects = activeProjects();
   if (projects.length === 0) {
-    container.innerHTML = `<span class="text-[11px] text-slate-500 italic">${escapeHtml(t('bau.noProjects'))}</span>`;
+    container.innerHTML = `<span class="text-[12px] text-slate-500 italic">${escapeHtml(t('bau.noProjects'))}</span>`;
     return;
   }
   container.innerHTML = projects
     .map(
       (p) => `
-      <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-900 border border-slate-700 rounded text-[11px] text-emerald-400 font-medium">
+      <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-900 border border-slate-700 rounded text-[12px] text-emerald-400 font-medium">
         <span>${escapeHtml(p.name)}</span>
         <button type="button" data-action="bau-project-remove" data-id="${escapeHtml(p.id)}" class="text-slate-500 hover:text-red-400"><i class="fa-solid fa-xmark"></i></button>
       </span>`,
@@ -123,7 +123,8 @@ function renderTable() {
   const dates = weekDates(view.weekStart);
 
   // Re-rendering replaces the inputs; put the cursor back where it was.
-  const focused = document.activeElement?.closest?.('#bauTableBody [data-user]');
+  const focused = document.activeElement?.closest?.('#bauTableBody [data-user], #bauMobileList [data-user]');
+  const focusIn = focused?.closest('#bauMobileList') ? 'bauMobileList' : 'bauTableBody';
   const focusKey = focused
     ? `[data-user="${focused.dataset.user}"][data-date="${focused.dataset.date}"][data-kind="${focused.dataset.kind}"]`
     : '';
@@ -140,6 +141,7 @@ function renderTable() {
 
   if (people.length === 0) {
     tbody.innerHTML = '';
+    $('bauMobileList').innerHTML = '';
     show('bauEmptyMessage', true);
     $('bauTotalWeeklyHours').innerText = '0 h';
     $('bauTotalWeeklyBreakdown').innerText = t('bau.breakdown', { w: 0, t: 0 });
@@ -180,14 +182,14 @@ function renderTable() {
               <select ${dis} data-change="bau-project" ${ids} data-kind="project" class="project-select ${locked ? 'opacity-60 cursor-not-allowed' : ''}">
                 ${projOptions}
               </select>
-              ${locked ? `<div class="text-[10px] font-bold text-emerald-400 text-center"><i class="fa-solid fa-lock"></i> ${escapeHtml(t('bau.signedAg'))}</div>` : ''}
+              ${locked ? `<div class="text-[11px] font-bold text-emerald-400 text-center"><i class="fa-solid fa-lock"></i> ${escapeHtml(t('bau.signedAg'))}</div>` : ''}
               <div class="flex items-center justify-between gap-1 bg-indigo-950/40 p-1 rounded border border-indigo-900/50">
                 <button type="button" ${dis} data-action="bau-quick" ${ids} data-type="work" data-kind="quick-work"
-                  class="px-1.5 py-0.5 rounded text-[10px] font-bold border ${rec.workHours > 0 ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-slate-800 text-indigo-400 border-slate-700'} ${dim}">
+                  class="px-1.5 py-0.5 rounded text-[11px] font-bold border ${rec.workHours > 0 ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-slate-800 text-indigo-400 border-slate-700'} ${dim}">
                   10h (R)
                 </button>
                 <div class="flex items-center">
-                  <span class="text-[10px] font-bold text-indigo-400 mr-1">R:</span>
+                  <span class="text-[11px] font-bold text-indigo-400 mr-1">R:</span>
                   <input type="number" min="0" max="24" step="0.5" inputmode="decimal" ${dis} value="${rec.workHours}"
                     data-change="bau-hours" ${ids} data-type="work" data-kind="work"
                     class="w-10 text-xs text-center p-0.5 bg-slate-900 border border-indigo-900/60 rounded text-white ${dim}">
@@ -195,11 +197,11 @@ function renderTable() {
               </div>
               <div class="flex items-center justify-between gap-1 bg-amber-950/40 p-1 rounded border border-amber-900/50">
                 <button type="button" ${dis} data-action="bau-quick" ${ids} data-type="travel" data-kind="quick-travel"
-                  class="px-1.5 py-0.5 rounded text-[10px] font-bold border ${rec.travelHours > 0 ? 'bg-amber-600 text-white border-amber-500' : 'bg-slate-800 text-amber-400 border-slate-700'} ${dim}">
+                  class="px-1.5 py-0.5 rounded text-[11px] font-bold border ${rec.travelHours > 0 ? 'bg-amber-600 text-white border-amber-500' : 'bg-slate-800 text-amber-400 border-slate-700'} ${dim}">
                   10h (P)
                 </button>
                 <div class="flex items-center">
-                  <span class="text-[10px] font-bold text-amber-400 mr-1">P:</span>
+                  <span class="text-[11px] font-bold text-amber-400 mr-1">P:</span>
                   <input type="number" min="0" max="24" step="0.5" inputmode="decimal" ${dis} value="${rec.travelHours}"
                     data-change="bau-hours" ${ids} data-type="travel" data-kind="travel"
                     class="w-10 text-xs text-center p-0.5 bg-slate-900 border border-amber-900/60 rounded text-white ${dim}">
@@ -216,8 +218,8 @@ function renderTable() {
 
       const roleSub =
         person.role === 'baulajter'
-          ? `<div class="text-[10px] font-bold text-emerald-400 uppercase mt-0.5">${escapeHtml(t('role.baulajter'))}</div>`
-          : `<div class="text-[10px] text-slate-400 uppercase mt-0.5">${escapeHtml(t(`role.${person.role}`))}</div>`;
+          ? `<div class="text-[11px] font-bold text-emerald-400 uppercase mt-0.5">${escapeHtml(t('role.baulajter'))}</div>`
+          : `<div class="text-[11px] text-slate-400 uppercase mt-0.5">${escapeHtml(t(`role.${person.role}`))}</div>`;
 
       return `
       <tr class="transition border-b border-slate-700/60 ${pTotal === 0 ? 'zero-hours-row' : ''}">
@@ -249,7 +251,92 @@ function renderTable() {
   $('bauTotalWeeklyHours').innerText = `${grandW + grandT} h`;
   $('bauTotalWeeklyBreakdown').innerText = t('bau.breakdown', { w: grandW, t: grandT });
 
-  if (focusKey) tbody.querySelector(focusKey)?.focus();
+  $('bauMobileList').innerHTML = renderMobileCards(people, dates, projects);
+
+  if (focusKey) $(focusIn).querySelector(focusKey)?.focus();
+}
+
+// Cards the user opened or closed by hand keep that state across re-renders.
+const cardOpen = new Map();
+
+/** Phone layout: one card per person, one row per day (same controls as the table). */
+function renderMobileCards(people, dates, projects) {
+  return people
+    .map((person) => {
+      let pWork = 0;
+      let pTravel = 0;
+      const rows = dates
+        .map((date, i) => {
+          const rec = getEntry(person.id, date);
+          pWork += rec.workHours;
+          pTravel += rec.travelHours;
+          const locked = isLocked(rec.projectId, date);
+          const dis = locked ? 'disabled' : '';
+          const dim = locked ? 'opacity-50 cursor-not-allowed' : '';
+          const ids = `data-user="${escapeHtml(person.id)}" data-date="${date}"`;
+          const dayId = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'][i];
+
+          let projOptions = `<option value="">${escapeHtml(t('bau.noProject'))}</option>`;
+          if (rec.projectId && !projects.some((p) => p.id === rec.projectId)) {
+            projOptions += `<option value="${escapeHtml(rec.projectId)}" selected>${escapeHtml(projectName(rec.projectId))}</option>`;
+          }
+          projOptions += projects
+            .map((p) => `<option value="${escapeHtml(p.id)}" ${rec.projectId === p.id ? 'selected' : ''}>${escapeHtml(p.name)}</option>`)
+            .join('');
+
+          return `
+          <div class="py-2.5 space-y-2 ${rec.workHours + rec.travelHours > 0 ? '' : 'opacity-90'}">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-300">${escapeHtml(t(`day.${dayId}`))} <span class="font-semibold text-slate-500">${date.slice(8, 10)}.${date.slice(5, 7)}.</span></span>
+              ${locked ? `<span class="text-[11px] font-bold text-emerald-400"><i class="fa-solid fa-lock"></i> ${escapeHtml(t('bau.signedAg'))}</span>` : ''}
+            </div>
+            <select ${dis} data-change="bau-project" ${ids} data-kind="project" class="project-select ${locked ? 'opacity-60 cursor-not-allowed' : ''}">
+              ${projOptions}
+            </select>
+            <div class="grid grid-cols-2 gap-2">
+              <div class="flex items-center justify-between gap-1.5 bg-indigo-950/40 p-1.5 rounded-lg border border-indigo-900/50">
+                <button type="button" ${dis} data-action="bau-quick" ${ids} data-type="work" data-kind="quick-work"
+                  class="px-2 py-1.5 rounded-md text-[12px] font-bold border whitespace-nowrap ${rec.workHours > 0 ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-slate-800 text-indigo-400 border-slate-700'} ${dim}">10h R</button>
+                <input type="number" min="0" max="24" step="0.5" inputmode="decimal" ${dis} value="${rec.workHours}" aria-label="R"
+                  data-change="bau-hours" ${ids} data-type="work" data-kind="work"
+                  class="w-14 text-sm text-center py-1.5 bg-slate-900 border border-indigo-900/60 rounded-md text-white ${dim}">
+              </div>
+              <div class="flex items-center justify-between gap-1.5 bg-amber-950/40 p-1.5 rounded-lg border border-amber-900/50">
+                <button type="button" ${dis} data-action="bau-quick" ${ids} data-type="travel" data-kind="quick-travel"
+                  class="px-2 py-1.5 rounded-md text-[12px] font-bold border whitespace-nowrap ${rec.travelHours > 0 ? 'bg-amber-600 text-white border-amber-500' : 'bg-slate-800 text-amber-400 border-slate-700'} ${dim}">10h P</button>
+                <input type="number" min="0" max="24" step="0.5" inputmode="decimal" ${dis} value="${rec.travelHours}" aria-label="P"
+                  data-change="bau-hours" ${ids} data-type="travel" data-kind="travel"
+                  class="w-14 text-sm text-center py-1.5 bg-slate-900 border border-amber-900/60 rounded-md text-white ${dim}">
+              </div>
+            </div>
+          </div>`;
+        })
+        .join('');
+
+      const roleLabel = person.role === 'baulajter' ? t('role.baulajter') : t(`role.${person.role}`);
+      return `
+      <details class="group p-4" data-person="${escapeHtml(person.id)}" ${(cardOpen.has(person.id) ? cardOpen.get(person.id) : pWork + pTravel > 0) ? 'open' : ''}>
+        <summary class="flex items-center justify-between gap-3 cursor-pointer list-none">
+          <div class="min-w-0">
+            <div class="font-bold text-white truncate">${escapeHtml(person.name)}</div>
+            <div class="text-[11px] uppercase mt-0.5 ${person.role === 'baulajter' ? 'font-bold text-emerald-400' : 'text-slate-400'}">${escapeHtml(roleLabel)}</div>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <span class="px-2 py-0.5 rounded text-xs font-bold bg-indigo-950 text-indigo-300 border border-indigo-800/60">R: ${pWork}h</span>
+            <span class="px-2 py-0.5 rounded text-xs font-bold bg-amber-950 text-amber-300 border border-amber-800/60">P: ${pTravel}h</span>
+            <i class="fa-solid fa-chevron-down text-xs text-slate-400 transition group-open:rotate-180"></i>
+          </div>
+        </summary>
+        <div class="mt-3 divide-y divide-slate-700/60">${rows}</div>
+        <div class="mt-3 pt-3 border-t border-slate-700 flex items-center justify-between">
+          <span class="text-sm font-black text-white">${escapeHtml(t('common.total'))}: ${pWork + pTravel}h</span>
+          <button type="button" data-action="bau-remove-person" data-user="${escapeHtml(person.id)}" class="text-xs font-semibold text-slate-400 hover:text-red-400 px-2 py-1.5 rounded-lg border border-slate-700">
+            <i class="fa-solid fa-xmark"></i> ${escapeHtml(t('bau.removeFromList'))}
+          </button>
+        </div>
+      </details>`;
+    })
+    .join('');
 }
 
 async function loadWeek() {
@@ -424,7 +511,7 @@ function renderReport() {
           </div>
           ${
             sig.userSignature
-              ? `<img src="${escapeHtml(sig.userSignature)}" alt="" class="rounded-lg max-h-24 p-1" style="background:#ffffff"><p class="text-[11px] font-bold text-indigo-300">${escapeHtml(t('report.signedBy'))} ${escapeHtml(sig.userSignedBy || '')}</p>`
+              ? `<img src="${escapeHtml(sig.userSignature)}" alt="" class="rounded-lg max-h-24 p-1" style="background:#ffffff"><p class="text-[12px] font-bold text-indigo-300">${escapeHtml(t('report.signedBy'))} ${escapeHtml(sig.userSignedBy || '')}</p>`
               : `<p class="text-xs text-slate-400 italic">${escapeHtml(t('report.signFirst'))}</p>`
           }
         </div>
@@ -439,7 +526,7 @@ function renderReport() {
           </div>
           ${
             kundeSigned
-              ? `<img src="${escapeHtml(sig.kundeSignature)}" alt="" class="rounded-lg max-h-24 p-1" style="background:#ffffff"><p class="text-[11px] font-bold text-emerald-400"><i class="fa-solid fa-lock"></i> ${escapeHtml(t('report.lockedNote'))}</p>`
+              ? `<img src="${escapeHtml(sig.kundeSignature)}" alt="" class="rounded-lg max-h-24 p-1" style="background:#ffffff"><p class="text-[12px] font-bold text-emerald-400"><i class="fa-solid fa-lock"></i> ${escapeHtml(t('report.lockedNote'))}</p>`
               : `<p class="text-xs text-slate-500 italic">${escapeHtml(sig.userSignature ? t('report.kundeHintReady') : t('report.kundeHintWait'))}</p>`
           }
         </div>
@@ -483,6 +570,12 @@ export function initBaulajter() {
     renderTable();
   });
   $('bauSearchListInput').addEventListener('input', renderTable);
+  $('bauMobileList').addEventListener('click', (e) => {
+    const summary = e.target.closest('summary');
+    if (!summary) return;
+    const card = summary.parentElement;
+    cardOpen.set(card.dataset.person, !card.open);
+  });
   $('bauMyMonthPicker').addEventListener('change', showMyHours);
 
   onAction('bau-add-person', async () => {

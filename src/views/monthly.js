@@ -46,7 +46,7 @@ export function buildMonthlyCardHtml(user, monthVal) {
       <div class="p-3.5 bg-slate-950/70 border-b border-slate-700 flex flex-wrap items-center justify-between gap-2">
         <div>
           <span class="text-sm font-extrabold text-white">${escapeHtml(user.name)}</span>
-          <span class="ml-2 text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-slate-800 text-indigo-300">${escapeHtml(t(`role.${user.role}`))}</span>
+          <span class="ml-2 text-[11px] font-bold uppercase px-2 py-0.5 rounded bg-slate-800 text-indigo-300">${escapeHtml(t(`role.${user.role}`))}</span>
         </div>
         <div class="flex items-center gap-3 text-xs font-bold">
           <span class="text-indigo-300">${escapeHtml(t('month.work'))}: ${totalW}h</span>

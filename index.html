@@ -54,41 +54,55 @@
     <div id="appScreen" class="hidden min-h-screen pb-12">
 
         <!-- ZAGLAVLJE -->
-        <header class="bg-slate-800 border-b border-slate-700 sticky top-0 z-30 shadow-xl">
-            <div class="max-w-[98%] mx-auto px-3 sm:px-4 py-3 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3">
-                <div class="flex items-center justify-between gap-3">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-lg text-white shadow">
+        <header class="bg-slate-800 border-b border-slate-700 md:sticky top-0 z-30 shadow-xl">
+            <div class="max-w-[98%] mx-auto px-1 sm:px-4 py-3 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3">
+                <div class="flex items-center justify-between gap-3 min-w-0">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <div class="w-10 h-10 shrink-0 bg-indigo-600 rounded-xl flex items-center justify-center text-lg text-white shadow">
                             <i class="fa-solid fa-clock"></i>
                         </div>
-                        <div>
-                            <div class="flex items-center gap-2">
-                                <span id="headerRoleBadge" class="text-xs font-extrabold uppercase tracking-wider text-indigo-300 bg-indigo-950/90 border border-indigo-700/70 px-2.5 py-0.5 rounded-lg"></span>
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-2 min-w-0">
+                                <span id="headerRoleBadge" class="inline-block text-xs font-extrabold uppercase tracking-wider leading-snug text-indigo-300 bg-indigo-950/90 border border-indigo-700/70 px-2.5 py-0.5 rounded-lg"></span>
                             </div>
-                            <p id="headerSubtitle" class="text-xs text-slate-400 mt-0.5"></p>
+                            <p id="headerSubtitle" class="hidden sm:block text-xs text-slate-400 mt-0.5"></p>
                         </div>
+                    </div>
+                    <!-- Jezik, tema, odjava (mobitel / tablet) -->
+                    <div class="flex xl:hidden items-center gap-1.5 shrink-0">
+                    <div class="flex items-center bg-slate-900 rounded-xl p-1 border border-slate-700" data-i18n-title="ui.language">
+                        <button type="button" class="seg-btn" data-action="set-lang" data-lang="bs">BS</button>
+                        <button type="button" class="seg-btn" data-action="set-lang" data-lang="sl">SL</button>
+                    </div>
+                    <button type="button" data-action="toggle-theme" class="bg-slate-900 hover:bg-slate-700 text-slate-300 px-3 py-2 rounded-xl text-xs font-bold border border-slate-700 transition" data-i18n-title="ui.theme">
+                        <i class="fa-solid fa-sun theme-icon"></i>
+                    </button>
+                    <button type="button" data-action="logout" class="bg-slate-900 hover:bg-red-950/70 text-slate-300 hover:text-red-300 px-3 py-2 rounded-xl text-xs font-bold border border-slate-700 hover:border-red-800 transition flex items-center gap-1.5" data-i18n-title="header.logout">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                        <span class="hidden sm:inline" data-i18n="header.logout"></span>
+                    </button>
                     </div>
                 </div>
 
                 <!-- Navigacija i kontrole -->
                 <div class="flex flex-wrap items-center gap-2">
-                    <nav id="roleNavTabs" class="flex flex-wrap items-center gap-1.5 bg-slate-900/90 p-1 rounded-xl border border-slate-700"></nav>
+                    <nav id="roleNavTabs" class="flex flex-wrap items-center gap-1.5 bg-slate-900/90 p-1 rounded-xl border border-slate-700 w-full sm:w-auto"></nav>
 
                     <!-- Odabir aktivne baustele za vodju delovišča -->
-                    <div id="bauSiteHeaderSelector" class="hidden flex items-center gap-1.5 bg-slate-900 rounded-xl px-2.5 py-1.5 border border-emerald-700/60">
+                    <div id="bauSiteHeaderSelector" class="hidden flex items-center gap-1.5 bg-slate-900 rounded-xl px-2.5 py-1.5 border border-emerald-700/60 max-w-full min-w-0">
                         <i class="fa-solid fa-building text-emerald-400 text-xs"></i>
-                        <select id="bauActiveSiteSelect" class="bg-transparent text-xs font-bold text-emerald-300 outline-none cursor-pointer"></select>
+                        <select id="bauActiveSiteSelect" class="bg-transparent text-xs font-bold text-emerald-300 outline-none cursor-pointer min-w-0 max-w-[16rem] truncate"></select>
                     </div>
 
                     <!-- KW kontrole -->
                     <div id="kwControlsGroup" class="hidden flex items-center bg-slate-900 rounded-xl p-1 border border-slate-700">
-                        <button type="button" data-action="bau-week" data-delta="-1" class="px-2.5 py-1 hover:bg-slate-800 rounded-lg text-slate-300 transition" data-i18n-title="header.prevWeek">
+                        <button type="button" data-action="bau-week" data-delta="-1" class="px-3 py-1.5 hover:bg-slate-800 rounded-lg text-slate-300 transition" data-i18n-title="header.prevWeek">
                             <i class="fa-solid fa-chevron-left"></i>
                         </button>
-                        <div class="px-3 text-center min-w-[125px]">
+                        <div class="px-2 sm:px-3 text-center min-w-[110px] sm:min-w-[125px]">
                             <span id="currentKwDisplay" class="font-bold text-xs sm:text-sm text-indigo-400">KW -- (----)</span>
                         </div>
-                        <button type="button" data-action="bau-week" data-delta="1" class="px-2.5 py-1 hover:bg-slate-800 rounded-lg text-slate-300 transition" data-i18n-title="header.nextWeek">
+                        <button type="button" data-action="bau-week" data-delta="1" class="px-3 py-1.5 hover:bg-slate-800 rounded-lg text-slate-300 transition" data-i18n-title="header.nextWeek">
                             <i class="fa-solid fa-chevron-right"></i>
                         </button>
                     </div>
@@ -100,25 +114,26 @@
                         <span data-i18n="header.downloadPdf"></span>
                     </button>
 
+                    <!-- Jezik, tema, odjava (desktop) -->
+                    <div class="hidden xl:flex items-center gap-2">
                     <div class="flex items-center bg-slate-900 rounded-xl p-1 border border-slate-700" data-i18n-title="ui.language">
                         <button type="button" class="seg-btn" data-action="set-lang" data-lang="bs">BS</button>
                         <button type="button" class="seg-btn" data-action="set-lang" data-lang="sl">SL</button>
                     </div>
-
                     <button type="button" data-action="toggle-theme" class="bg-slate-900 hover:bg-slate-700 text-slate-300 px-3 py-2 rounded-xl text-xs font-bold border border-slate-700 transition" data-i18n-title="ui.theme">
                         <i class="fa-solid fa-sun theme-icon"></i>
                     </button>
-
-                    <button type="button" id="logoutBtn" data-action="logout" class="bg-slate-900 hover:bg-red-950/70 text-slate-300 hover:text-red-300 px-3 py-2 rounded-xl text-xs font-bold border border-slate-700 hover:border-red-800 transition flex items-center gap-1.5">
+                    <button type="button" data-action="logout" class="bg-slate-900 hover:bg-red-950/70 text-slate-300 hover:text-red-300 px-3 py-2 rounded-xl text-xs font-bold border border-slate-700 hover:border-red-800 transition flex items-center gap-1.5" data-i18n-title="header.logout">
                         <i class="fa-solid fa-right-from-bracket"></i>
-                        <span data-i18n="header.logout"></span>
+                        <span class="hidden sm:inline" data-i18n="header.logout"></span>
                     </button>
+                    </div>
                 </div>
             </div>
         </header>
 
         <!-- GLAVNI KONTEJNER -->
-        <main class="max-w-[98%] mx-auto px-2 sm:px-4 py-6 space-y-6">
+        <main class="max-w-[98%] mx-auto px-1 sm:px-4 py-4 sm:py-6 space-y-6">
 
             <!-- ================= SEKCIJA 1: ADMINISTRATOR ================= -->
             <section id="adminSection" class="hidden space-y-6">
@@ -254,8 +269,8 @@
             <!-- ================= SEKCIJA 2: VODJA DELOVIŠČA ================= -->
             <section id="baulajterSection" class="hidden space-y-6">
                 <div id="bauTabWeekly" class="space-y-6">
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 flex flex-col justify-between gap-3 shadow-md">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+                        <div class="col-span-2 md:col-span-1 bg-slate-800 p-4 rounded-xl border border-slate-700 flex flex-col justify-between gap-3 shadow-md">
                             <div>
                                 <h2 class="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-2 flex items-center gap-2">
                                     <i class="fa-solid fa-user-plus"></i> <span data-i18n="bau.addFromGroup"></span>
@@ -271,7 +286,7 @@
                             </div>
                         </div>
 
-                        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 flex flex-col justify-between gap-2 shadow-md">
+                        <div class="col-span-2 md:col-span-1 bg-slate-800 p-4 rounded-xl border border-slate-700 flex flex-col justify-between gap-2 shadow-md">
                             <div>
                                 <span class="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5 mb-2">
                                     <i class="fa-solid fa-folder-plus"></i> <span data-i18n="bau.projectList"></span>
@@ -291,7 +306,7 @@
                                 <p id="bauActiveListCount" class="text-2xl font-black text-white mt-1">0</p>
                                 <p id="bauCurrentSiteLabel" class="text-xs text-emerald-400 mt-1 truncate max-w-[160px]">Baustelle</p>
                             </div>
-                            <div class="w-12 h-12 bg-indigo-950/80 text-indigo-400 border border-indigo-800/60 rounded-xl flex items-center justify-center text-xl">
+                            <div class="hidden sm:flex w-12 h-12 bg-indigo-950/80 text-indigo-400 border border-indigo-800/60 rounded-xl items-center justify-center text-xl">
                                 <i class="fa-solid fa-users"></i>
                             </div>
                         </div>
@@ -302,7 +317,7 @@
                                 <p id="bauTotalWeeklyHours" class="text-2xl font-black text-indigo-400 mt-1">0 h</p>
                                 <p id="bauTotalWeeklyBreakdown" class="text-xs text-slate-400 mt-1"></p>
                             </div>
-                            <div class="w-12 h-12 bg-emerald-950/80 text-emerald-400 border border-emerald-800/60 rounded-xl flex items-center justify-center text-xl">
+                            <div class="hidden sm:flex w-12 h-12 bg-emerald-950/80 text-emerald-400 border border-emerald-800/60 rounded-xl items-center justify-center text-xl">
                                 <i class="fa-solid fa-calculator"></i>
                             </div>
                         </div>
@@ -322,7 +337,8 @@
                             </div>
                         </div>
 
-                        <div class="overflow-x-auto">
+                        <div id="bauMobileList" class="md:hidden divide-y divide-slate-700/80"></div>
+                        <div class="bau-table-wrap hidden md:block overflow-x-auto">
                             <table class="w-full text-left border-collapse min-w-[1150px]">
                                 <thead>
                                     <tr class="bg-slate-900/90 text-slate-400 text-xs font-bold uppercase tracking-wider border-b border-slate-700">
@@ -465,7 +481,7 @@
             <div id="signatureContextBox" class="hidden bg-slate-900/95 border border-slate-700 rounded-xl p-4 space-y-3 text-xs">
                 <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
                     <span id="sigLangBadge" class="px-2.5 py-0.5 rounded-lg font-bold bg-indigo-950 text-indigo-300 border border-indigo-700">DE</span>
-                    <button type="button" data-action="sig-switch-lang" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-[11px] font-bold border border-slate-600">
+                    <button type="button" data-action="sig-switch-lang" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-[12px] font-bold border border-slate-600">
                         DE / SL
                     </button>
                 </div>

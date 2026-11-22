@@ -93,7 +93,7 @@ function renderKundeDetails(lang) {
 
   const meta = (label, value, color) => `
     <div class="bg-slate-800/90 border border-slate-700 rounded-lg p-2.5">
-      <div class="text-[10px] font-bold uppercase text-slate-400">${label}</div>
+      <div class="text-[11px] font-bold uppercase text-slate-400">${label}</div>
       <div class="font-bold ${color} mt-0.5">${escapeHtml(value)}</div>
     </div>`;
   $('sigCompanyMetaGrid').innerHTML =
@@ -103,7 +103,7 @@ function renderKundeDetails(lang) {
 
   const totalAll = rows.reduce((acc, r) => acc + r.personSum, 0);
   $('sigHoursPreviewContainer').innerHTML = `
-    <table class="w-full text-left border-collapse text-[11px]">
+    <table class="w-full text-left border-collapse text-[12px]">
       <thead class="bg-slate-950 text-slate-300 border-b border-slate-800">
         <tr>
           <th class="p-2">${L.worker}</th>

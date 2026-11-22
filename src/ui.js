@@ -77,10 +77,10 @@ export function show(id, visible = true) {
 
 export function roleBadgeHtml(role) {
   if (role === 'admin') {
-    return `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-700">${escapeHtml(t('role.admin'))}</span>`;
+    return `<span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-950 text-amber-300 border border-amber-700">${escapeHtml(t('role.admin'))}</span>`;
   }
   if (role === 'baulajter') {
-    return `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-700">${escapeHtml(t('role.baulajter'))}</span>`;
+    return `<span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-700">${escapeHtml(t('role.baulajter'))}</span>`;
   }
-  return `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-950 text-indigo-300 border border-indigo-700">${escapeHtml(t('role.radnik'))}</span>`;
+  return `<span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-indigo-950 text-indigo-300 border border-indigo-700">${escapeHtml(t('role.radnik'))}</span>`;
 }
