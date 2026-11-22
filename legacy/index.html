@@ -1,0 +1,3200 @@
+<!DOCTYPE html>
+<html lang="bs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evidencija Radnih i Putnih Sati — Pro Sistem</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Ikone -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- html2pdf.js za izvoz u PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+        * {
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: #0f172a;
+            color: #f8fafc;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        select.project-select {
+            background-color: #1e293b;
+            color: #e2e8f0;
+            border: 1px solid #475569;
+            border-radius: 0.5rem;
+            padding: 0.4rem 0.6rem;
+            font-size: 0.75rem;
+            width: 100%;
+            outline: none;
+            cursor: pointer;
+        }
+
+        select.project-select:focus {
+            border-color: #6366f1;
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25);
+        }
+
+        select.project-select option {
+            background-color: #0f172a;
+            color: #ffffff;
+        }
+
+        .pdf-header {
+            display: none;
+        }
+        .pdf-mode .pdf-header {
+            display: block;
+        }
+        .pdf-mode .no-pdf {
+            display: none !important;
+        }
+        .pdf-mode .zero-hours-row {
+            display: none !important;
+        }
+        .pdf-mode tbody {
+            counter-reset: pdf-row-counter;
+        }
+        .pdf-mode tr:not(.zero-hours-row) .row-number::before {
+            counter-increment: pdf-row-counter;
+            content: counter(pdf-row-counter) ".";
+        }
+        .pdf-mode tr:not(.zero-hours-row) .row-number-text {
+            display: none;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100">
+
+    <!-- ================= EKRAN ZA PRIJAVU (LOGIN) ================= -->
+    <div id="loginScreen" class="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950">
+        <div class="w-full max-w-md bg-slate-800/95 border border-slate-700 rounded-2xl shadow-2xl p-6 sm:p-8 space-y-6">
+            <div class="text-center space-y-2">
+                <div class="w-14 h-14 bg-indigo-600 rounded-2xl mx-auto flex items-center justify-center text-2xl text-white shadow-lg shadow-indigo-600/30">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                </div>
+                <h1 class="text-xl font-extrabold text-white tracking-tight">SCARA-Tec • Evidencija Sati</h1>
+                <p class="text-xs text-slate-400">Prijavite se kao Administrator, Vodja delovišča ili Radnik</p>
+                <div id="cloudSyncStatusBadge" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-950 text-indigo-300 border border-indigo-700">
+                    <i class="fa-solid fa-cloud-arrow-down"></i>
+                    <span>Povezivanje sa Supabase bazom...</span>
+                </div>
+            </div>
+
+            <form id="loginForm" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Korisničko ime</label>
+                    <input type="text" id="loginUsername" required placeholder="Unesite korisničko ime..."
+                        class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Lozinka</label>
+                    <input type="password" id="loginPassword" required placeholder="Unesite lozinku..."
+                        class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+                </div>
+                <div id="loginErrorMsg" class="hidden text-xs font-semibold text-red-400 bg-red-950/60 border border-red-800/70 rounded-xl px-3 py-2"></div>
+                <button type="submit" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm rounded-xl shadow-lg transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-right-to-bracket"></i>
+                    <span>Prijavi se</span>
+                </button>
+                <div id="loginCloudDebugMsg" class="text-[11px] text-center text-slate-400 pt-1"></div>
+            </form>
+
+            <!-- Brza prijava za testiranje uloga -->
+            <div class="pt-4 border-t border-slate-700/80 space-y-2">
+                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400 text-center">Brza prijava (Demo nalozi)</p>
+                <div class="grid grid-cols-3 gap-2">
+                    <button type="button" onclick="quickLogin('admin', 'admin')" class="p-2 bg-slate-900 hover:bg-slate-700 border border-slate-700 rounded-xl text-center transition">
+                        <div class="text-xs font-bold text-amber-400">Admin</div>
+                        <div class="text-[10px] text-slate-400">admin / admin</div>
+                    </button>
+                    <button type="button" onclick="quickLogin('baulajter', '1234')" class="p-2 bg-slate-900 hover:bg-slate-700 border border-slate-700 rounded-xl text-center transition">
+                        <div class="text-xs font-bold text-emerald-400">Vodja delovišča</div>
+                        <div class="text-[10px] text-slate-400">baulajter / 1234</div>
+                    </button>
+                    <button type="button" onclick="quickLogin('marko', '1234')" class="p-2 bg-slate-900 hover:bg-slate-700 border border-slate-700 rounded-xl text-center transition">
+                        <div class="text-xs font-bold text-indigo-400">Radnik</div>
+                        <div class="text-[10px] text-slate-400">marko / 1234</div>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= GLAVNI EKRAN APLIKACIJE ================= -->
+    <div id="appScreen" class="hidden min-h-screen pb-12">
+
+        <!-- ZAGLAVLJE -->
+        <header class="bg-slate-800 border-b border-slate-700 sticky top-0 z-30 shadow-xl">
+            <div class="max-w-[98%] mx-auto px-3 sm:px-4 py-3 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3">
+                <div class="flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-lg text-white shadow">
+                            <i class="fa-solid fa-clock"></i>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <span id="headerRoleBadge" class="text-xs font-extrabold uppercase tracking-wider text-indigo-300 bg-indigo-950/90 border border-indigo-700/70 px-2.5 py-0.5 rounded-lg">KORISNIK</span>
+                            </div>
+                            <p id="headerSubtitle" class="text-xs text-slate-400 mt-0.5">Evidencija radnih i putnih sati</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Navigacija i kontrole -->
+                <div class="flex flex-wrap items-center gap-2">
+                    <nav id="roleNavTabs" class="flex flex-wrap items-center gap-1.5 bg-slate-900/90 p-1 rounded-xl border border-slate-700"></nav>
+
+                    <!-- Odabir aktivne baustele za vodju delovišča -->
+                    <div id="bauSiteHeaderSelector" class="hidden flex items-center gap-1.5 bg-slate-900 rounded-xl px-2.5 py-1.5 border border-emerald-700/60">
+                        <i class="fa-solid fa-building text-emerald-400 text-xs"></i>
+                        <select id="bauActiveSiteSelect" class="bg-transparent text-xs font-bold text-emerald-300 outline-none cursor-pointer"></select>
+                    </div>
+
+                    <!-- KW kontrole -->
+                    <div id="kwControlsGroup" class="hidden flex items-center bg-slate-900 rounded-xl p-1 border border-slate-700">
+                        <button type="button" id="prevKwBtn" class="px-2.5 py-1 hover:bg-slate-800 rounded-lg text-slate-300 transition" title="Prethodna sedmica">
+                            <i class="fa-solid fa-chevron-left"></i>
+                        </button>
+                        <div class="px-3 text-center min-w-[125px]">
+                            <span id="currentKwDisplay" class="font-bold text-xs sm:text-sm text-indigo-400">KW -- (----)</span>
+                        </div>
+                        <button type="button" id="nextKwBtn" class="px-2.5 py-1 hover:bg-slate-800 rounded-lg text-slate-300 transition" title="Naredna sedmica">
+                            <i class="fa-solid fa-chevron-right"></i>
+                        </button>
+                    </div>
+
+                    <button type="button" id="todayKwBtn" class="hidden bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-2 rounded-xl text-xs font-semibold border border-slate-600 transition">
+                        Ova sedmica
+                    </button>
+
+                    <button type="button" id="downloadPdfBtn" class="hidden bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow flex items-center gap-1.5 transition">
+                        <i class="fa-solid fa-file-pdf"></i>
+                        <span>Preuzmi PDF</span>
+                    </button>
+
+                    <button type="button" id="logoutBtn" class="bg-slate-900 hover:bg-red-950/70 text-slate-300 hover:text-red-300 px-3 py-2 rounded-xl text-xs font-bold border border-slate-700 hover:border-red-800 transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                        <span>Odjava</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- GLAVNI KONTEJNER -->
+        <main class="max-w-[98%] mx-auto px-2 sm:px-4 py-6 space-y-6">
+
+            <!-- ================= SEKCIJA 1: ADMINISTRATOR ================= -->
+            <section id="adminSection" class="hidden space-y-6">
+
+                <!-- Admin Tab 1: Baustelle -->
+                <div id="adminTabBaustelle" class="hidden space-y-6">
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-lg lg:col-span-2">
+                            <h2 class="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                <i class="fa-solid fa-helmet-safety"></i> Kreiraj novu Baustellu (gradilište)
+                            </h2>
+                            <form id="adminAddSiteForm" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
+                                <input type="text" id="newSiteName" required placeholder="Mjesto / Naziv baustele (npr. Stuttgart Mercedes Benz)..."
+                                    class="md:col-span-2 px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500">
+                                <input type="text" id="newSiteCompany" required placeholder="Firma / Auftraggeber (npr. KS ENGINEERS)..."
+                                    class="md:col-span-2 px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500">
+                                <select id="newSiteBaulajter" required class="md:col-span-2 px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500">
+                                    <option value="">-- Dodijeli glavnog Vodju delovišča --</option>
+                                </select>
+                                <input type="text" id="newSiteDefaultProject" placeholder="Projekat (npr. 1768/25-1800149)..."
+                                    class="px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500">
+                                <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5">
+                                    <i class="fa-solid fa-plus"></i> Kreiraj Baustellu
+                                </button>
+                            </form>
+                        </div>
+
+                        <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-lg flex items-center justify-between">
+                            <div>
+                                <p class="text-xs font-bold uppercase tracking-wider text-slate-400">Aktivne Baustelle</p>
+                                <p id="adminTotalSitesCount" class="text-3xl font-black text-emerald-400 mt-1">0</p>
+                                <p class="text-xs text-slate-400 mt-1">Kliknite na baustellu ispod za grupu i PDF sate</p>
+                            </div>
+                            <div class="w-12 h-12 bg-emerald-950/80 text-emerald-400 border border-emerald-800/60 rounded-xl flex items-center justify-center text-xl">
+                                <i class="fa-solid fa-building"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="adminSitesGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+                    <div id="adminSelectedSitePanel" class="hidden bg-slate-800 p-5 rounded-xl border border-indigo-700/70 shadow-xl space-y-5"></div>
+                </div>
+
+                <!-- Admin Tab 2: Baza podataka & Mjesečni pregled -->
+                <div id="adminTabDatabase" class="hidden space-y-6">
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-lg lg:col-span-2">
+                            <h2 class="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                <i class="fa-solid fa-user-plus"></i> Dodaj radnika ili vodju delovišča u bazu podataka
+                            </h2>
+                            <form id="adminAddUserForm" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                                <input type="text" id="newUserName" required placeholder="Ime i prezime..."
+                                    class="px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+                                <input type="text" id="newUserUsername" required placeholder="Korisničko ime (login)..."
+                                    class="px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+                                <input type="text" id="newUserPassword" required placeholder="Lozinka..."
+                                    class="px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+                                <input type="email" id="newUserEmail" placeholder="E-mail adresa..."
+                                    class="px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+                                <input type="text" id="newUserPhone" placeholder="Broj telefona..."
+                                    class="px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+                                <div class="flex gap-2">
+                                    <select id="newUserRole" class="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500">
+                                        <option value="radnik">Radnik</option>
+                                        <option value="baulajter">Vodja delovišča</option>
+                                        <option value="admin">Administrator</option>
+                                    </select>
+                                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-xs font-bold transition shrink-0">
+                                        Dodaj
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-lg flex flex-col justify-between gap-3">
+                            <div>
+                                <h2 class="text-xs font-bold text-amber-400 uppercase tracking-wider mb-1 flex items-center gap-2">
+                                    <i class="fa-solid fa-database"></i> Sigurnosna kopija podataka
+                                </h2>
+                                <p class="text-xs text-slate-400">Sačuvajte ili vratite kompletnu bazu radnika, baustela i sati.</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button type="button" onclick="exportBackupJson()" class="flex-1 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-xs font-bold border border-slate-600 transition">
+                                    <i class="fa-solid fa-download mr-1"></i> Sačuvaj kopiju
+                                </button>
+                                <label class="flex-1 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-xs font-bold border border-slate-600 transition text-center cursor-pointer">
+                                    <i class="fa-solid fa-upload mr-1"></i> Učitaj kopiju
+                                    <input type="file" id="importBackupInput" accept=".json" class="hidden">
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-800 rounded-xl border border-slate-700 shadow-lg overflow-hidden">
+                        <div class="p-4 border-b border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300">Svi zaposleni u bazi podataka (Uvid i izmjena logina/lozinke)</h3>
+                            <span id="adminDbCountBadge" class="text-xs font-semibold text-indigo-400">0 korisnika</span>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse min-w-[920px] text-xs">
+                                <thead>
+                                    <tr class="bg-slate-900/90 text-slate-400 uppercase border-b border-slate-700">
+                                        <th class="p-3">Ime i prezime</th>
+                                        <th class="p-3">Uloga</th>
+                                        <th class="p-3">Login (Korisničko ime)</th>
+                                        <th class="p-3">Lozinka (Password)</th>
+                                        <th class="p-3">Telefon</th>
+                                        <th class="p-3">E-mail</th>
+                                        <th class="p-3 text-right">Akcije</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="adminUsersTableBody" class="divide-y divide-slate-700/70"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-lg space-y-4">
+                        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                            <div>
+                                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                                    <i class="fa-solid fa-magnifying-glass text-indigo-400"></i> Mjesečni pregled sati (Radnik / Vodja delovišča)
+                                </h3>
+                                <p class="text-xs text-slate-400">Unesite ime radnika ili vodje delovišča i odaberite mjesec</p>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <input type="text" id="adminSearchPersonInput" placeholder="Pretraži po imenu..."
+                                    class="px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+                                <input type="month" id="adminMonthPicker"
+                                    class="px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500">
+                            </div>
+                        </div>
+                        <div id="adminMonthlySearchResult" class="space-y-4"></div>
+                    </div>
+                </div>
+
+                <!-- Admin Tab 3: Pregled sati po projektu (KW) & Potpis -->
+                <div id="adminTabProjects" class="hidden space-y-6"></div>
+            </section>
+
+            <!-- ================= SEKCIJA 2: VODJA DELOVIŠČA ================= -->
+            <section id="baulajterSection" class="hidden space-y-6">
+                <div id="bauTabWeekly" class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 flex flex-col justify-between gap-3 shadow-md">
+                            <div>
+                                <h2 class="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                    <i class="fa-solid fa-user-plus"></i> Dodaj iz grupe baustele
+                                </h2>
+                                <div class="flex gap-2">
+                                    <select id="bauAddPersonSelect" class="project-select"></select>
+                                    <button type="button" onclick="addPersonToBaulajterList()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition shrink-0">
+                                        Dodaj
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="pt-2 border-t border-slate-700/60">
+                                <input type="text" id="bauSearchListInput" placeholder="Filtriraj spisak..."
+                                    class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-indigo-500 placeholder-slate-500">
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 flex flex-col justify-between gap-2 shadow-md">
+                            <div>
+                                <span class="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5 mb-2">
+                                    <i class="fa-solid fa-folder-plus"></i> Lista Projekata
+                                </span>
+                                <form id="bauAddProjectForm" class="flex gap-2">
+                                    <input type="text" id="bauNewProjectInput" placeholder="Novi projekat..." required
+                                        class="flex-1 px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500">
+                                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition shrink-0">
+                                        Dodaj
+                                    </button>
+                                </form>
+                            </div>
+                            <div id="bauProjectsListContainer" class="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto pt-2 border-t border-slate-700/60"></div>
+                        </div>
+
+                        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 flex items-center justify-between shadow-md">
+                            <div>
+                                <p class="text-xs uppercase tracking-wider font-bold text-slate-400">Na spisku sati</p>
+                                <p id="bauActiveListCount" class="text-2xl font-black text-white mt-1">0</p>
+                                <p id="bauCurrentSiteLabel" class="text-xs text-emerald-400 mt-1 truncate max-w-[160px]">Baustelle</p>
+                            </div>
+                            <div class="w-12 h-12 bg-indigo-950/80 text-indigo-400 border border-indigo-800/60 rounded-xl flex items-center justify-center text-xl">
+                                <i class="fa-solid fa-users"></i>
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 flex items-center justify-between shadow-md">
+                            <div>
+                                <p class="text-xs uppercase tracking-wider font-bold text-slate-400">Ukupno sati (KW)</p>
+                                <p id="bauTotalWeeklyHours" class="text-2xl font-black text-indigo-400 mt-1">0 h</p>
+                                <p id="bauTotalWeeklyBreakdown" class="text-xs text-slate-400 mt-1">Radni: 0h | Putni: 0h</p>
+                            </div>
+                            <div class="w-12 h-12 bg-emerald-950/80 text-emerald-400 border border-emerald-800/60 rounded-xl flex items-center justify-center text-xl">
+                                <i class="fa-solid fa-calculator"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="pdfContent" class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden shadow-xl">
+                        <div class="pdf-header p-6 bg-slate-950 text-white border-b border-slate-800">
+                            <div class="flex justify-between items-center">
+                                <div>
+                                    <h1 class="text-2xl font-bold">IZVJEŠTAJ RADNIH I PUTNIH SATI</h1>
+                                    <p class="text-sm text-slate-400 mt-1" id="pdfKwTitle">Sedmica: KW --</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-xs text-slate-400">Datum generisanja:</p>
+                                    <p class="text-sm font-semibold" id="pdfReportDate">--.--.----</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse min-w-[1150px]">
+                                <thead>
+                                    <tr class="bg-slate-900/90 text-slate-400 text-xs font-bold uppercase tracking-wider border-b border-slate-700">
+                                        <th class="p-3 text-center w-10">#</th>
+                                        <th class="p-3 w-48">Radnik / Vodja delovišča</th>
+                                        <th class="p-3 text-center">Ponedjeljak</th>
+                                        <th class="p-3 text-center">Utorak</th>
+                                        <th class="p-3 text-center">Srijeda</th>
+                                        <th class="p-3 text-center">Četvrtak</th>
+                                        <th class="p-3 text-center">Petak</th>
+                                        <th class="p-3 text-center">Subota</th>
+                                        <th class="p-3 text-center">Nedjelja</th>
+                                        <th class="p-3 text-center w-36">Ukupno (KW)</th>
+                                        <th class="p-3 text-center w-14 no-pdf">Akcija</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="bauTableBody" class="divide-y divide-slate-700/80 text-sm"></tbody>
+                            </table>
+                        </div>
+
+                        <div id="bauEmptyMessage" class="hidden p-10 text-center text-slate-400 text-xs">
+                            Nema dodanih radnika na spisku za ovu baustellu. Odaberite osobu iz vaše grupe iznad.
+                        </div>
+
+                        <div class="pdf-header p-4 bg-slate-950 border-t border-slate-800 text-xs text-slate-400 flex justify-between">
+                            <span>Evidencija radnih i putnih sati</span>
+                            <span id="pdfTotalFooter">Ukupno sati: 0h</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="bauTabMyHours" class="hidden space-y-4">
+                    <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                            <h2 class="text-sm font-bold text-white">Moji evidentirani sati po mjesecima</h2>
+                            <p class="text-xs text-slate-400">Pregled vaših radnih i putnih sati po danima</p>
+                        </div>
+                        <input type="month" id="bauMyMonthPicker" class="px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white">
+                    </div>
+                    <div id="bauMyMonthlyContent"></div>
+                </div>
+
+                <div id="bauTabProjects" class="hidden space-y-6"></div>
+            </section>
+
+            <!-- ================= SEKCIJA 3: RADNIK ================= -->
+            <section id="radnikSection" class="hidden space-y-4">
+                <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                        <h2 class="text-sm font-bold text-white">Moji sati (Samo uvid)</h2>
+                        <p class="text-xs text-slate-400">Pregled vaših radnih (R) i putnih (P) sati za odabrani mjesec</p>
+                    </div>
+                    <input type="month" id="radnikMonthPicker" class="px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white">
+                </div>
+                <div id="radnikMonthlyContent"></div>
+            </section>
+
+            <!-- ================= SEKCIJA 4: IMENIK ZAPOSLENIH ================= -->
+            <section id="directorySection" class="hidden space-y-4">
+                <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-lg space-y-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                            <h2 class="text-base font-bold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-address-book text-indigo-400"></i> Imenik zaposlenih u firmi
+                            </h2>
+                            <p class="text-xs text-slate-400">Kontakti svih radnika, vodja delovišča i administratora</p>
+                        </div>
+                        <input type="text" id="directorySearchInput" placeholder="Pretraži imenik po imenu..."
+                            class="px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+                    </div>
+                    <div id="directoryCardsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- ================= MODAL ZA IZMJENU LOGIN PODATAKA (ADMIN) ================= -->
+    <div id="editCredentialsModal" class="fixed inset-0 bg-black/75 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="bg-slate-800 rounded-2xl border border-slate-700 max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-indigo-950 text-indigo-400 border border-indigo-700 rounded-xl flex items-center justify-center">
+                    <i class="fa-solid fa-key"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-white">Uredi pristupne podatke</h3>
+                    <p id="editCredUserDisplay" class="text-xs text-slate-400">Korisnik</p>
+                </div>
+            </div>
+            <form id="editCredentialsForm" class="space-y-3">
+                <input type="hidden" id="editCredUserId">
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Korisničko ime (Login)</label>
+                    <input type="text" id="editCredUsername" required
+                        class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Lozinka (Password)</label>
+                    <input type="text" id="editCredPassword" required
+                        class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500">
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Telefon</label>
+                        <input type="text" id="editCredPhone"
+                            class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">E-mail</label>
+                        <input type="email" id="editCredEmail"
+                            class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500">
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 pt-3 border-t border-slate-700">
+                    <button type="button" onclick="closeEditCredentialsModal()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-xl text-xs text-slate-200 font-semibold">
+                        Odustani
+                    </button>
+                    <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold">
+                        Sačuvaj izmjene
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ================= MODAL ZA POTVRDU ================= -->
+    <div id="confirmModal" class="fixed inset-0 bg-black/75 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="bg-slate-800 rounded-2xl border border-slate-700 max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <h3 id="confirmModalTitle" class="text-base font-bold text-white">Potvrda</h3>
+            <p id="confirmModalText" class="text-xs text-slate-300 leading-relaxed"></p>
+            <div class="flex justify-end gap-2 pt-2">
+                <button type="button" id="confirmModalCancelBtn" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-xl text-xs text-slate-200 font-semibold">Odustani</button>
+                <button type="button" id="confirmModalOkBtn" class="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold">Potvrdi</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= MODAL ZA ELEKTRONSKI POTPIS ================= -->
+    <div id="signatureModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="bg-slate-800 rounded-2xl border border-slate-700 max-w-2xl w-full p-6 space-y-4 shadow-2xl max-h-[92vh] overflow-y-auto">
+            <div>
+                <h3 id="signatureModalTitle" class="text-base font-bold text-white">Elektronski potpis</h3>
+                <p id="signatureModalSubtitle" class="text-xs text-slate-400 mt-1">Potpišite prstom ili mišem u polju ispod</p>
+            </div>
+
+            <div id="signatureContextBox" class="hidden bg-slate-900/95 border border-slate-700 rounded-xl p-4 space-y-3 text-xs">
+                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
+                    <span id="sigLangBadge" class="px-2.5 py-0.5 rounded-lg font-bold bg-indigo-950 text-indigo-300 border border-indigo-700">DE</span>
+                    <button type="button" id="sigSwitchLangBtn" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-[11px] font-bold border border-slate-600">
+                        DE / SL
+                    </button>
+                </div>
+                <div id="sigCompanyMetaGrid" class="grid grid-cols-1 sm:grid-cols-3 gap-2.5"></div>
+                <div id="sigHoursPreviewContainer" class="overflow-x-auto max-h-52 border border-slate-800 rounded-lg"></div>
+            </div>
+
+            <div class="bg-white rounded-xl overflow-hidden border-2 border-indigo-500">
+                <canvas id="signatureCanvas" class="w-full h-44 block touch-none cursor-crosshair"></canvas>
+            </div>
+            <div class="flex items-center justify-between gap-2 pt-1">
+                <button type="button" onclick="clearSignaturePad()" id="sigClearBtn" class="px-3.5 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl text-xs font-semibold">
+                    Očisti potpis
+                </button>
+                <div class="flex gap-2">
+                    <button type="button" onclick="closeSignatureModal()" id="sigCancelBtn" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl text-xs font-semibold">
+                        Odustani
+                    </button>
+                    <button type="button" onclick="saveSignatureFromPad()" id="sigSaveBtn" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold">
+                        Sačuvaj potpis
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL ZA ODABIR JEZIKA POTPISA BAULAITER AG -->
+    <div id="kundeLangModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="bg-slate-800 rounded-2xl border border-slate-700 max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div>
+                <h3 class="text-base font-bold text-white">Baulaiter AG — Odabir jezika / Izbira jezika</h3>
+                <p class="text-xs text-slate-400 mt-1">Želite li prikaz i obrazloženje sati na njemačkom ili slovenskom jeziku?</p>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <button type="button" id="chooseKundeLangDeBtn" class="p-3.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow transition">
+                    <i class="fa-solid fa-language"></i>
+                    <span>Deutsch (Njemački)</span>
+                </button>
+                <button type="button" id="chooseKundeLangSlBtn" class="p-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow transition">
+                    <i class="fa-solid fa-language"></i>
+                    <span>Slovenščina (Slovenski)</span>
+                </button>
+            </div>
+            <div class="flex justify-end pt-2 border-t border-slate-700">
+                <button type="button" onclick="closeKundeLangModal()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-xl text-xs text-slate-200 font-semibold">
+                    Odustani
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- OBAVJEŠTENJE (TOAST) -->
+    <div id="toastMessage" class="fixed bottom-5 right-5 z-50 hidden bg-slate-800 text-white border border-indigo-500/70 px-4 py-3 rounded-xl shadow-2xl text-xs font-semibold"></div>
+
+    <!-- KONTEJNER ZA STUNDENNACHWEIS PDF FORMAT (SCARA-Tec) -->
+    <div id="scaraPdfExportRoot" style="position: fixed; left: 0; top: 0; width: 760px; background: #ffffff; color: #000000; z-index: -50; opacity: 0; pointer-events: none;"></div>
+
+    <script>
+        const STORAGE_KEY = 'scara_tec_evidencija_pro_v1';
+        const SUPABASE_URL = 'https://pjelwskexxjulhrzolsq.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_gxpu5_zfkFrXKmrZOe9lCA_JnxEOp_l';
+        const SUPABASE_ROW_ID = 'scara_tec_main_state';
+        let isSyncingFromCloud = false;
+        let cloudSaveTimeout = null;
+        let hasPendingCloudWrite = false;
+        let lastCloudError = '';
+
+        const daysOfWeek = [
+            { id: 'mon', name: 'Ponedjeljak' },
+            { id: 'tue', name: 'Utorak' },
+            { id: 'wed', name: 'Srijeda' },
+            { id: 'thu', name: 'Četvrtak' },
+            { id: 'fri', name: 'Petak' },
+            { id: 'sat', name: 'Subota' },
+            { id: 'sun', name: 'Nedjelja' }
+        ];
+
+        function getKW(date) {
+            const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+            const dayNum = d.getUTCDay() || 7;
+            d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+            const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+            return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+        }
+
+        function getWeekKey(year, kw) {
+            return `${year}-KW${String(kw).padStart(2, '0')}`;
+        }
+
+        function getDefaultData() {
+            const now = new Date();
+            const yr = now.getFullYear();
+            const kw = getKW(now);
+            const wk = getWeekKey(yr, kw);
+
+            return {
+                users: [
+                    { id: 'u_admin', name: 'Administrator', username: 'admin', password: 'admin', role: 'admin', email: 'admin@scara-tec.si', phone: '+386 59 77 915' },
+                    { id: 'u_bau', name: 'Ervin Ćurović', username: 'baulajter', password: '1234', role: 'baulajter', email: 'ervin.curovic@scara-tec.si', phone: '+386 41 111 222' },
+                    { id: 'u_marko', name: 'Marko Marković', username: 'marko', password: '1234', role: 'radnik', email: 'marko.m@scara-tec.si', phone: '+386 41 333 444' },
+                    { id: 'u_sasa', name: 'Saša Jovanović', username: 'sasa', password: '1234', role: 'radnik', email: 'sasa.j@scara-tec.si', phone: '+386 41 555 666' }
+                ],
+                projects: ['1768/25-1800149', 'Objekat Centar', 'Hala A1'],
+                baustellen: [
+                    {
+                        id: 'site_1',
+                        location: 'Stuttgart Mercedes Benz',
+                        company: 'KS ENGINEERS, Kristl, Seibt & Co Ges.m.b.H',
+                        baulajterId: 'u_bau',
+                        memberIds: ['u_bau', 'u_marko', 'u_sasa'],
+                        projects: ['1768/25-1800149']
+                    }
+                ],
+                bauLists: {
+                    'u_bau__site_1': ['u_bau', 'u_marko', 'u_sasa']
+                },
+                timeRecords: {
+                    u_bau: {
+                        [wk]: {
+                            mon: { project: '1768/25-1800149', workHours: 10, travelHours: 0 },
+                            tue: { project: '1768/25-1800149', workHours: 10, travelHours: 0 },
+                            wed: { project: '1768/25-1800149', workHours: 10, travelHours: 0 },
+                            thu: { project: '', workHours: 0, travelHours: 0 },
+                            fri: { project: '1768/25-1800149', workHours: 10, travelHours: 0 },
+                            sat: { project: '', workHours: 0, travelHours: 0 },
+                            sun: { project: '', workHours: 0, travelHours: 0 }
+                        }
+                    },
+                    u_marko: {
+                        [wk]: {
+                            mon: { project: '1768/25-1800149', workHours: 10, travelHours: 0 },
+                            tue: { project: '1768/25-1800149', workHours: 10, travelHours: 0 },
+                            wed: { project: '1768/25-1800149', workHours: 10, travelHours: 0 },
+                            thu: { project: '1768/25-1800149', workHours: 10, travelHours: 0 },
+                            fri: { project: '1768/25-1800149', workHours: 10, travelHours: 0 },
+                            sat: { project: '', workHours: 0, travelHours: 0 },
+                            sun: { project: '', workHours: 0, travelHours: 0 }
+                        }
+                    }
+                },
+                projectSignatures: {}
+            };
+        }
+
+        let appData = getDefaultData();
+        let currentUser = null;
+        let currentYear = new Date().getFullYear();
+        let currentKW = getKW(new Date());
+        let reportYear = currentYear;
+        let reportKW = currentKW;
+        let selectedReportProject = '';
+        let adminSiteYear = currentYear;
+        let adminSiteKW = currentKW;
+        let selectedAdminSiteId = '';
+        let selectedAdminSiteProject = '';
+        let adminSiteFilterStatus = 'all';
+        let activeBauSiteId = '';
+        let pendingConfirmCallback = null;
+        let activeSignatureTarget = null;
+        let isDrawingSig = false;
+        let hasDrawnSig = false;
+        let visiblePasswordsMap = {};
+
+        function saveData() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+            } catch (err) {
+                console.error('Greška pri čuvanju u localStorage:', err);
+            }
+            if (!isSyncingFromCloud) {
+                hasPendingCloudWrite = true;
+                setCloudStatusBadge('syncing', 'Slanje promjena u Supabase...');
+                clearTimeout(cloudSaveTimeout);
+                cloudSaveTimeout = setTimeout(() => {
+                    pushStateToSupabase();
+                }, 80);
+            }
+        }
+
+        function setCloudStatusBadge(mode, text) {
+            const badge = document.getElementById('cloudSyncStatusBadge');
+            const loginInfo = document.getElementById('loginCloudDebugMsg');
+            if (loginInfo) {
+                loginInfo.innerText = text;
+                loginInfo.className = `text-[11px] text-center pt-1 font-semibold ${
+                    mode === 'ok' ? 'text-emerald-400' : mode === 'error' ? 'text-red-400' : 'text-indigo-300'
+                }`;
+            }
+            if (!badge) return;
+            if (mode === 'ok') {
+                badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-700';
+                badge.innerHTML = `<i class="fa-solid fa-cloud-check"></i><span>${escapeHtml(text)}</span>`;
+            } else if (mode === 'error') {
+                badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-red-950 text-red-300 border border-red-700';
+                badge.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i><span>${escapeHtml(text)}</span>`;
+            } else {
+                badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-950 text-indigo-300 border border-indigo-700';
+                badge.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i><span>${escapeHtml(text)}</span>`;
+            }
+        }
+
+        async function pushStateToSupabase() {
+            try {
+                const payload = JSON.stringify({
+                    id: SUPABASE_ROW_ID,
+                    data: appData,
+                    updated_at: new Date().toISOString()
+                });
+                const res = await fetch(`${SUPABASE_URL}/rest/v1/app_state?on_conflict=id`, {
+                    method: 'POST',
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Content-Type': 'application/json',
+                        'Prefer': 'resolution=merge-duplicates,return=minimal'
+                    },
+                    body: payload,
+                    cache: 'no-store'
+                });
+                if (!res.ok) {
+                    const errText = await res.text().catch(() => '');
+                    lastCloudError = `Supabase upis (${res.status}): ${errText || 'provjerite RLS politiku'}`;
+                    console.error(lastCloudError);
+                    setCloudStatusBadge('error', lastCloudError);
+                    return false;
+                }
+                lastCloudError = '';
+                hasPendingCloudWrite = false;
+                setCloudStatusBadge('ok', `Sačuvano u bazu (${new Date().toLocaleTimeString('bs-BA')})`);
+                return true;
+            } catch (err) {
+                lastCloudError = `Mrežna greška pri upisu: ${err?.message || 'provjerite internet'}`;
+                console.error('Supabase sync write error:', err);
+                setCloudStatusBadge('error', lastCloudError);
+                return false;
+            }
+        }
+
+        async function pullStateFromSupabase(applyIfChanged = false) {
+            if (hasPendingCloudWrite) {
+                await pushStateToSupabase();
+            }
+            try {
+                const url = `${SUPABASE_URL}/rest/v1/app_state?id=eq.${encodeURIComponent(SUPABASE_ROW_ID)}&select=data`;
+                const res = await fetch(url, {
+                    method: 'GET',
+                    cache: 'no-store',
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                    }
+                });
+                if (!res.ok) {
+                    const errText = await res.text().catch(() => '');
+                    let parsedMsg = errText;
+                    try {
+                        const j = JSON.parse(errText);
+                        parsedMsg = j.message || j.hint || j.details || errText;
+                    } catch (_) {}
+                    lastCloudError = `Baza (${res.status}): ${parsedMsg || 'provjerite tabelu app_state i RLS'}`;
+                    console.error(lastCloudError);
+                    setCloudStatusBadge('error', lastCloudError);
+                    return false;
+                }
+                const rows = await res.json();
+                if (Array.isArray(rows) && rows.length > 0 && rows[0].data) {
+                    const remoteData = rows[0].data;
+                    const localJson = JSON.stringify(appData);
+                    const remoteJson = JSON.stringify(remoteData);
+                    if (localJson !== remoteJson) {
+                        isSyncingFromCloud = true;
+                        const def = getDefaultData();
+                        appData = {
+                            users: Array.isArray(remoteData.users) && remoteData.users.length ? remoteData.users : def.users,
+                            projects: Array.isArray(remoteData.projects) ? remoteData.projects : def.projects,
+                            baustellen: Array.isArray(remoteData.baustellen) ? remoteData.baustellen : def.baustellen,
+                            bauLists: remoteData.bauLists && typeof remoteData.bauLists === 'object' ? remoteData.bauLists : def.bauLists,
+                            timeRecords: remoteData.timeRecords && typeof remoteData.timeRecords === 'object' ? remoteData.timeRecords : def.timeRecords,
+                            projectSignatures: remoteData.projectSignatures && typeof remoteData.projectSignatures === 'object' ? remoteData.projectSignatures : {}
+                        };
+                        localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+                        isSyncingFromCloud = false;
+                        if (applyIfChanged && currentUser) {
+                            const updatedSelf = appData.users.find(u => u.id === currentUser.id);
+                            if (updatedSelf) currentUser = updatedSelf;
+                            refreshActiveScreenQuietly();
+                        }
+                    }
+                    lastCloudError = '';
+                    setCloudStatusBadge('ok', `Sinhronizovano (${appData.users.length} korisnika, ${appData.baustellen.length} baustela)`);
+                    return true;
+                } else {
+                    await pushStateToSupabase();
+                    return true;
+                }
+            } catch (err) {
+                isSyncingFromCloud = false;
+                lastCloudError = `Greška mreže: ${err?.message || 'nepoznata greška'}`;
+                console.error('Supabase sync read error:', err);
+                setCloudStatusBadge('error', lastCloudError);
+                return false;
+            }
+        }
+
+        function refreshActiveScreenQuietly() {
+            const activeEl = document.activeElement;
+            if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'SELECT')) return;
+            if (!document.getElementById('signatureModal')?.classList.contains('hidden')) return;
+            if (!document.getElementById('kundeLangModal')?.classList.contains('hidden')) return;
+
+            if (currentUser.role === 'admin') {
+                if (!document.getElementById('adminTabBaustelle')?.classList.contains('hidden')) {
+                    renderAdminBaustelleView();
+                } else if (!document.getElementById('adminTabDatabase')?.classList.contains('hidden')) {
+                    renderAdminDatabase();
+                }
+            } else if (currentUser.role === 'baulajter') {
+                if (!document.getElementById('bauTabWeekly')?.classList.contains('hidden')) {
+                    renderBaulajterTable();
+                } else if (!document.getElementById('bauTabProjects')?.classList.contains('hidden')) {
+                    renderProjectReportSection('bauTabProjects');
+                }
+            } else if (currentUser.role === 'radnik') {
+                if (!document.getElementById('radnikSection')?.classList.contains('hidden')) {
+                    openRadnikView();
+                }
+            }
+        }
+
+        function loadData() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (!raw) {
+                    appData = getDefaultData();
+                    saveData();
+                    return;
+                }
+                const parsed = JSON.parse(raw);
+                const def = getDefaultData();
+                appData = {
+                    users: Array.isArray(parsed.users) && parsed.users.length ? parsed.users : def.users,
+                    projects: Array.isArray(parsed.projects) ? parsed.projects : def.projects,
+                    baustellen: Array.isArray(parsed.baustellen) ? parsed.baustellen : def.baustellen,
+                    bauLists: parsed.bauLists && typeof parsed.bauLists === 'object' ? parsed.bauLists : def.bauLists,
+                    timeRecords: parsed.timeRecords && typeof parsed.timeRecords === 'object' ? parsed.timeRecords : def.timeRecords,
+                    projectSignatures: parsed.projectSignatures && typeof parsed.projectSignatures === 'object' ? parsed.projectSignatures : {}
+                };
+            } catch (err) {
+                console.error('Greška pri učitavanju podataka:', err);
+                appData = getDefaultData();
+            }
+        }
+
+        function findWeekRecordForUser(userId, weekKey) {
+            const userRecs = appData.timeRecords?.[userId];
+            if (!userRecs) return null;
+            if (userRecs[weekKey]) return userRecs[weekKey];
+            const altKey = weekKey.replace('-KW0', '-KW');
+            return userRecs[altKey] || null;
+        }
+
+        function findSignatureRecordForProjectWeek(projectName, weekKey) {
+            if (!projectName) return {};
+            const directKey = `${projectName}__${weekKey}`;
+            if (appData.projectSignatures?.[directKey]) {
+                return appData.projectSignatures[directKey];
+            }
+            const altWeekKey = weekKey.replace('-KW0', '-KW');
+            const altKey = `${projectName}__${altWeekKey}`;
+            if (appData.projectSignatures?.[altKey]) {
+                return appData.projectSignatures[altKey];
+            }
+            for (const [k, v] of Object.entries(appData.projectSignatures || {})) {
+                if (k.startsWith(`${projectName}__`) && (k.endsWith(`__${weekKey}`) || k.endsWith(`__${altWeekKey}`))) {
+                    return v;
+                }
+            }
+            return {};
+        }
+
+        function deleteKundeSignatureByAdmin(projectName, weekKey) {
+            if (!currentUser || currentUser.role !== 'admin' || !projectName) return;
+            const directKey = `${projectName}__${weekKey}`;
+            const altWeekKey = weekKey.replace('-KW0', '-KW');
+            const altKey = `${projectName}__${altWeekKey}`;
+
+            let deleted = false;
+            [directKey, altKey, ...Object.keys(appData.projectSignatures || {})].forEach(k => {
+                if (
+                    k === directKey ||
+                    k === altKey ||
+                    (k.startsWith(`${projectName}__`) && (k.endsWith(`__${weekKey}`) || k.endsWith(`__${altWeekKey}`)))
+                ) {
+                    if (appData.projectSignatures?.[k]?.kundeSignature) {
+                        delete appData.projectSignatures[k].kundeSignature;
+                        delete appData.projectSignatures[k].kundeSignedAt;
+                        delete appData.projectSignatures[k].kundeLang;
+                        deleted = true;
+                    }
+                }
+            });
+
+            if (deleted) {
+                saveData();
+                renderAdminSelectedSiteDetails();
+                showToast(`Potpis Baulaiter AG za projekat "${projectName}" (${weekKey}) je obrisan. Vodja delovišča može ponovo uređivati sate.`);
+            }
+        }
+
+        function quickLogin(username, password) {
+            document.getElementById('loginUsername').value = username;
+            document.getElementById('loginPassword').value = password;
+            attemptLogin(username, password);
+        }
+
+        async function attemptLogin(username, password) {
+            const uTrim = (username || '').trim().toLowerCase();
+            const pTrim = (password || '').trim();
+            const errEl = document.getElementById('loginErrorMsg');
+
+            setCloudStatusBadge('syncing', 'Provjera korisnika u Supabase bazi...');
+            await pullStateFromSupabase(false);
+
+            const found = appData.users.find(u =>
+                u.username.toLowerCase() === uTrim && String(u.password) === pTrim
+            );
+
+            if (!found) {
+                const detail = lastCloudError ? ` (${lastCloudError})` : ` — u bazi trenutno ima ${appData.users.length} korisnika.`;
+                errEl.innerText = `Pogrešno korisničko ime ili lozinka${detail}`;
+                errEl.classList.remove('hidden');
+                return;
+            }
+
+            errEl.classList.add('hidden');
+            currentUser = found;
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('appScreen').classList.remove('hidden');
+            renderAppForRole();
+        }
+
+        function logoutUser() {
+            currentUser = null;
+            document.getElementById('appScreen').classList.add('hidden');
+            document.getElementById('loginScreen').classList.remove('hidden');
+            document.getElementById('loginPassword').value = '';
+        }
+
+        function setActiveNavButton(activeId) {
+            const nav = document.getElementById('roleNavTabs');
+            nav.querySelectorAll('button').forEach(btn => {
+                if (btn.id === activeId) {
+                    btn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 text-white shadow transition flex items-center gap-1.5';
+                } else {
+                    btn.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-1.5';
+                }
+            });
+        }
+
+        function openDirectoryView() {
+            document.getElementById('adminSection').classList.add('hidden');
+            document.getElementById('baulajterSection').classList.add('hidden');
+            document.getElementById('radnikSection').classList.add('hidden');
+            document.getElementById('kwControlsGroup').classList.add('hidden');
+            document.getElementById('todayKwBtn').classList.add('hidden');
+            document.getElementById('downloadPdfBtn').classList.add('hidden');
+            document.getElementById('bauSiteHeaderSelector').classList.add('hidden');
+            document.getElementById('directorySection').classList.remove('hidden');
+            setActiveNavButton('navDirectory');
+            renderDirectory();
+        }
+
+        function renderAppForRole() {
+            if (!currentUser) return;
+
+            document.getElementById('adminSection').classList.add('hidden');
+            document.getElementById('baulajterSection').classList.add('hidden');
+            document.getElementById('radnikSection').classList.add('hidden');
+            document.getElementById('directorySection').classList.add('hidden');
+
+            const badge = document.getElementById('headerRoleBadge');
+            const sub = document.getElementById('headerSubtitle');
+            const nav = document.getElementById('roleNavTabs');
+
+            const currentYM = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+
+            if (currentUser.role === 'admin') {
+                badge.innerText = `ADMINISTRATOR • ${currentUser.name}`;
+                sub.innerText = 'Upravljanje baustelama, bazom podataka, mjesečnim pregledom i PDF izvještajima';
+                nav.innerHTML = `
+                    <button type="button" id="navAdminSites" onclick="switchAdminView('baustelle')"><i class="fa-solid fa-building"></i> Baustelle</button>
+                    <button type="button" id="navAdminDb" onclick="switchAdminView('database')"><i class="fa-solid fa-users-gear"></i> Baza & Mjeseci</button>
+                    <button type="button" id="navDirectory" onclick="openDirectoryView()"><i class="fa-solid fa-address-book"></i> Imenik</button>
+                `;
+                if (!document.getElementById('adminMonthPicker').value) {
+                    document.getElementById('adminMonthPicker').value = currentYM;
+                }
+                switchAdminView('baustelle');
+            } else if (currentUser.role === 'baulajter') {
+                badge.innerText = `VODJA DELOVIŠČA • ${currentUser.name}`;
+                sub.innerText = 'Unos sati za grupu na bausteli, moji sati i potpisivanje po KW i projektu';
+                nav.innerHTML = `
+                    <button type="button" id="navBauWeekly" onclick="switchBaulajterView('weekly')"><i class="fa-solid fa-calendar-week"></i> Sedmični sati</button>
+                    <button type="button" id="navBauMy" onclick="switchBaulajterView('myhours')"><i class="fa-solid fa-user-clock"></i> Moji sati</button>
+                    <button type="button" id="navBauProj" onclick="switchBaulajterView('projects')"><i class="fa-solid fa-file-signature"></i> Projekti & Potpis</button>
+                    <button type="button" id="navDirectory" onclick="openDirectoryView()"><i class="fa-solid fa-address-book"></i> Imenik</button>
+                `;
+                if (!document.getElementById('bauMyMonthPicker').value) {
+                    document.getElementById('bauMyMonthPicker').value = currentYM;
+                }
+                switchBaulajterView('weekly');
+            } else {
+                badge.innerText = `RADNIK • ${currentUser.name}`;
+                sub.innerText = 'Mjesečni uvid u radne i putne sate te imenik zaposlenih';
+                nav.innerHTML = `
+                    <button type="button" id="navRadnikHours" onclick="openRadnikView()"><i class="fa-solid fa-clock"></i> Moji sati</button>
+                    <button type="button" id="navDirectory" onclick="openDirectoryView()"><i class="fa-solid fa-address-book"></i> Imenik</button>
+                `;
+                if (!document.getElementById('radnikMonthPicker').value) {
+                    document.getElementById('radnikMonthPicker').value = currentYM;
+                }
+                openRadnikView();
+            }
+        }
+
+        function openRadnikView() {
+            document.getElementById('directorySection').classList.add('hidden');
+            document.getElementById('kwControlsGroup').classList.add('hidden');
+            document.getElementById('todayKwBtn').classList.add('hidden');
+            document.getElementById('downloadPdfBtn').classList.add('hidden');
+            document.getElementById('bauSiteHeaderSelector').classList.add('hidden');
+            document.getElementById('radnikSection').classList.remove('hidden');
+            setActiveNavButton('navRadnikHours');
+            const mVal = document.getElementById('radnikMonthPicker').value;
+            document.getElementById('radnikMonthlyContent').innerHTML = buildMonthlyCardHtml(currentUser, mVal);
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            loadData();
+            setupListeners();
+            setupSignatureCanvas();
+            await pullStateFromSupabase(false);
+            setInterval(() => {
+                if (!hasPendingCloudWrite) {
+                    pullStateFromSupabase(true);
+                }
+            }, 3000);
+            window.addEventListener('beforeunload', () => {
+                if (hasPendingCloudWrite) {
+                    pushStateToSupabase();
+                }
+            });
+        });
+
+        function renderPdfHtmlToFile(htmlString, filename) {
+            const root = document.getElementById('scaraPdfExportRoot');
+            root.style.opacity = '1';
+            root.style.zIndex = '9999';
+            root.style.left = '0px';
+            root.style.top = '0px';
+            root.style.width = '760px';
+            root.style.maxWidth = '760px';
+            root.style.height = 'auto';
+            root.style.overflow = 'visible';
+            root.innerHTML = htmlString;
+
+            const targetEl = root.firstElementChild;
+            targetEl.style.transformOrigin = 'top left';
+            targetEl.style.transform = 'none';
+
+            const maxSinglePageHeight = 520;
+            const naturalHeight = targetEl.scrollHeight || targetEl.offsetHeight || 520;
+            if (naturalHeight > maxSinglePageHeight) {
+                const shrinkRatio = Math.max(0.55, maxSinglePageHeight / naturalHeight);
+                targetEl.style.zoom = String(shrinkRatio);
+            } else {
+                targetEl.style.zoom = '1';
+            }
+
+            const opt = {
+                margin: [4, 4, 4, 4],
+                filename,
+                image: { type: 'jpeg', quality: 0.98 },
+                pagebreak: { mode: ['avoid-all'] },
+                html2canvas: {
+                    scale: 1.6,
+                    useCORS: true,
+                    logging: false,
+                    backgroundColor: '#ffffff',
+                    x: 0,
+                    y: 0,
+                    width: 760,
+                    windowWidth: 780,
+                    scrollX: 0,
+                    scrollY: 0
+                },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+            };
+
+            const cleanup = () => {
+                root.style.opacity = '0';
+                root.style.zIndex = '-50';
+                root.style.left = '-10000px';
+                root.innerHTML = '';
+            };
+
+            return html2pdf().set(opt).from(targetEl).save().then(() => {
+                cleanup();
+                showToast('PDF Stundennachweis je preuzet.');
+            }).catch((err) => {
+                console.error('PDF export error:', err);
+                cleanup();
+                showToast('Greška pri generisanju PDF-a.', true);
+            });
+        }
+
+        // ================= ADMINISTRATOR: BAUSTELLE =================
+        function switchAdminView(tab) {
+            document.getElementById('directorySection').classList.add('hidden');
+            document.getElementById('adminSection').classList.remove('hidden');
+            document.getElementById('kwControlsGroup').classList.add('hidden');
+            document.getElementById('todayKwBtn').classList.add('hidden');
+            document.getElementById('downloadPdfBtn').classList.add('hidden');
+            document.getElementById('bauSiteHeaderSelector').classList.add('hidden');
+
+            document.getElementById('adminTabDatabase').classList.add('hidden');
+            document.getElementById('adminTabProjects').classList.add('hidden');
+            document.getElementById('adminTabBaustelle').classList.add('hidden');
+
+            if (tab === 'baustelle') {
+                setActiveNavButton('navAdminSites');
+                document.getElementById('adminTabBaustelle').classList.remove('hidden');
+                renderAdminBaustelleView();
+            } else if (tab === 'database') {
+                setActiveNavButton('navAdminDb');
+                document.getElementById('adminTabDatabase').classList.remove('hidden');
+                renderAdminDatabase();
+                renderAdminMonthlySearch();
+            } else {
+                setActiveNavButton('navAdminProj');
+                document.getElementById('adminTabProjects').classList.remove('hidden');
+                renderProjectReportSection('adminTabProjects');
+            }
+        }
+
+        function renderAdminBaustelleView() {
+            const bauSelect = document.getElementById('newSiteBaulajter');
+            const baulajteri = appData.users.filter(u => u.role === 'baulajter');
+            bauSelect.innerHTML = `<option value="">-- Dodijeli glavnog Vodju delovišča --</option>` +
+                baulajteri.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
+
+            document.getElementById('adminTotalSitesCount').innerText = appData.baustellen.length;
+
+            const grid = document.getElementById('adminSitesGrid');
+            grid.innerHTML = '';
+
+            if (appData.baustellen.length === 0) {
+                grid.innerHTML = `<div class="col-span-full bg-slate-800 border border-slate-700 rounded-xl p-6 text-center text-xs text-slate-400">Još nema kreiranih baustela. Kreirajte prvu baustellu iznad.</div>`;
+                document.getElementById('adminSelectedSitePanel').classList.add('hidden');
+                return;
+            }
+
+            if (!selectedAdminSiteId || !appData.baustellen.some(s => s.id === selectedAdminSiteId)) {
+                selectedAdminSiteId = appData.baustellen[0].id;
+            }
+
+            appData.baustellen.forEach(site => {
+                const bauUser = appData.users.find(u => u.id === site.baulajterId);
+                const members = (site.memberIds || [])
+                    .map(id => appData.users.find(u => u.id === id))
+                    .filter(Boolean);
+                const isSelected = site.id === selectedAdminSiteId;
+
+                const card = document.createElement('div');
+                card.className = `bg-slate-800 rounded-xl border p-4 shadow-lg flex flex-col justify-between gap-3 cursor-pointer transition ${
+                    isSelected ? 'border-emerald-500 ring-2 ring-emerald-500/30' : 'border-slate-700 hover:border-slate-500'
+                }`;
+                card.onclick = () => {
+                    selectedAdminSiteId = site.id;
+                    renderAdminBaustelleView();
+                };
+
+                const memberChips = members.length
+                    ? members.map(m => `<span class="text-[11px] px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-slate-200">${escapeHtml(m.name)}</span>`).join('')
+                    : `<span class="text-xs text-slate-500 italic">Nema dodijeljenih radnika</span>`;
+
+                card.innerHTML = `
+                    <div class="space-y-2">
+                        <div class="flex items-start justify-between gap-2">
+                            <div>
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Baustelle</span>
+                                <h3 class="text-base font-extrabold text-white">${escapeHtml(site.location)}</h3>
+                            </div>
+                            <button type="button" onclick="event.stopPropagation(); deleteBaustelle('${site.id}', '${escapeHtml(site.location)}')" class="text-slate-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-slate-700 transition" title="Obriši baustellu">
+                                <i class="fa-solid fa-trash-can text-xs"></i>
+                            </button>
+                        </div>
+                        <p class="text-xs text-slate-300"><strong class="text-slate-400">Firma (AG):</strong> ${escapeHtml(site.company)}</p>
+                        <p class="text-xs text-indigo-300"><strong class="text-slate-400">Vodja delovišča:</strong> ${bauUser ? escapeHtml(bauUser.name) : 'Nije dodijeljen'}</p>
+                        <div class="pt-2 border-t border-slate-700/70">
+                            <p class="text-[11px] font-semibold text-slate-400 mb-1.5">Tim na bausteli (${members.length}):</p>
+                            <div class="flex flex-wrap gap-1">${memberChips}</div>
+                        </div>
+                    </div>
+                    <div class="pt-2 border-t border-slate-700/60 flex items-center justify-between text-xs font-bold text-emerald-400">
+                        <span>Otvori grupu, projekte i PDF</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+
+            renderAdminSelectedSiteDetails();
+        }
+
+        function deleteBaustelle(siteId, siteName) {
+            showConfirmModal(
+                'Brisanje baustele',
+                `Jeste li sigurni da želite obrisati baustellu "${siteName}"?`,
+                () => {
+                    appData.baustellen = appData.baustellen.filter(s => s.id !== siteId);
+                    if (selectedAdminSiteId === siteId) selectedAdminSiteId = '';
+                    saveData();
+                    renderAdminBaustelleView();
+                    showToast(`Baustelle "${siteName}" je obrisana.`);
+                }
+            );
+        }
+
+        function renderAdminSelectedSiteDetails() {
+            const panel = document.getElementById('adminSelectedSitePanel');
+            const site = appData.baustellen.find(s => s.id === selectedAdminSiteId);
+            if (!site) {
+                panel.classList.add('hidden');
+                return;
+            }
+            panel.classList.remove('hidden');
+
+            const baulajteri = appData.users.filter(u => u.role === 'baulajter');
+            const availablePeople = appData.users.filter(u =>
+                (u.role === 'radnik' || u.role === 'baulajter') && !(site.memberIds || []).includes(u.id)
+            );
+            const siteMembers = (site.memberIds || [])
+                .map(id => appData.users.find(u => u.id === id))
+                .filter(Boolean);
+
+            const siteProjSet = new Set([...(site.projects || []), ...appData.projects]);
+            const siteProjects = Array.from(siteProjSet);
+            if (!selectedAdminSiteProject || !siteProjects.includes(selectedAdminSiteProject)) {
+                selectedAdminSiteProject = siteProjects[0] || '';
+            }
+
+            const weekKey = getWeekKey(adminSiteYear, adminSiteKW);
+            const sigRecord = findSignatureRecordForProjectWeek(selectedAdminSiteProject, weekKey);
+            const isSignedByKunde = Boolean(sigRecord.kundeSignature);
+
+            const candidateIds = new Set(siteMembers.map(m => m.id));
+            appData.users.forEach(u => candidateIds.add(u.id));
+
+            const reportRows = [];
+            candidateIds.forEach(personId => {
+                const person = appData.users.find(u => u.id === personId);
+                if (!person) return;
+                const weekRec = findWeekRecordForUser(person.id, weekKey);
+                if (!weekRec) return;
+
+                let hasAny = false;
+                let totalP = 0;
+                const dayBreakdown = {};
+
+                daysOfWeek.forEach(d => {
+                    const entry = weekRec[d.id];
+                    if (entry && entry.project === selectedAdminSiteProject) {
+                        const w = Number(entry.workHours) || 0;
+                        const t = Number(entry.travelHours) || 0;
+                        if (w > 0 || t > 0) hasAny = true;
+                        totalP += w + t;
+                        dayBreakdown[d.id] = { delo: w, deloOstalo: t, odmor: w > 0 ? 0.5 : 0, sum: w + t };
+                    } else {
+                        dayBreakdown[d.id] = { delo: 0, deloOstalo: 0, odmor: 0, sum: 0 };
+                    }
+                });
+
+                if (hasAny) {
+                    reportRows.push({
+                        person,
+                        days: dayBreakdown,
+                        totalHours: totalP,
+                        signed: isSignedByKunde
+                    });
+                }
+            });
+
+            const filteredRows = reportRows.filter(r => {
+                if (adminSiteFilterStatus === 'signed') return r.signed;
+                if (adminSiteFilterStatus === 'unsigned') return !r.signed;
+                return true;
+            });
+
+            panel.innerHTML = `
+                <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-700 pb-4">
+                    <div>
+                        <span class="text-xs font-bold uppercase tracking-wider text-emerald-400">Detalji Baustele</span>
+                        <h3 class="text-lg font-extrabold text-white">${escapeHtml(site.location)} — <span class="text-slate-300 font-semibold">${escapeHtml(site.company)}</span></h3>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button type="button" onclick="downloadScaraPdfForSite('${site.id}', 'all')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow flex items-center gap-1.5 transition">
+                            <i class="fa-solid fa-file-pdf"></i> PDF Svi sati
+                        </button>
+                        <button type="button" onclick="downloadScaraPdfForSite('${site.id}', 'signed')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow flex items-center gap-1.5 transition">
+                            <i class="fa-solid fa-file-signature"></i> PDF Potpisani
+                        </button>
+                        <button type="button" onclick="downloadScaraPdfForSite('${site.id}', 'unsigned')" class="bg-amber-600 hover:bg-amber-500 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow flex items-center gap-1.5 transition">
+                            <i class="fa-solid fa-clock"></i> PDF Nepotpisani
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 bg-slate-900/70 p-4 rounded-xl border border-slate-700">
+                    <div class="space-y-2.5">
+                        <label class="block text-xs font-bold uppercase tracking-wider text-indigo-300">Glavni Vodja delovišča za ovu baustellu</label>
+                        <select onchange="updateSiteBaulajter('${site.id}', this.value)" class="project-select">
+                            <option value="">-- Izaberi Vodju delovišča --</option>
+                            ${baulajteri.map(b => `<option value="${b.id}" ${b.id === site.baulajterId ? 'selected' : ''}>${escapeHtml(b.name)}</option>`).join('')}
+                        </select>
+
+                        <label class="block text-xs font-bold uppercase tracking-wider text-emerald-300 pt-2">Dodaj radnika/vodju delovišča u grupu ove baustele</label>
+                        <div class="flex gap-2">
+                            <select id="adminAddMemberToSiteSelect" class="project-select">
+                                <option value="">-- Izaberi osobu iz baze --</option>
+                                ${availablePeople.map(p => `<option value="${p.id}">${escapeHtml(p.name)} (${p.role === 'baulajter' ? 'Vodja delovišča' : 'Radnik'})</option>`).join('')}
+                            </select>
+                            <button type="button" onclick="adminAddMemberToSite('${site.id}')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-1.5 rounded-lg text-xs font-bold shrink-0">
+                                Dodaj
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <p class="text-xs font-bold uppercase tracking-wider text-slate-400">Članovi grupe na bausteli (${siteMembers.length})</p>
+                        <div class="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                            ${siteMembers.map(m => `
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-800 border border-slate-600 text-white">
+                                    <span>${escapeHtml(m.name)} (${m.role === 'baulajter' ? 'VD' : 'R'})</span>
+                                    <button type="button" onclick="adminRemoveMemberFromSite('${site.id}', '${m.id}')" class="text-slate-400 hover:text-red-400">
+                                        <i class="fa-solid fa-xmark"></i>
+                                    </button>
+                                </span>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-slate-900/50 p-3.5 rounded-xl border border-slate-700">
+                    <div class="flex flex-wrap items-center gap-2.5">
+                        <span class="text-xs font-bold text-slate-400">Projekat:</span>
+                        <select onchange="selectedAdminSiteProject = this.value; renderAdminSelectedSiteDetails();" class="project-select min-w-[200px]">
+                            ${siteProjects.map(p => `<option value="${escapeHtml(p)}" ${p === selectedAdminSiteProject ? 'selected' : ''}>${escapeHtml(p)}</option>`).join('')}
+                        </select>
+
+                        <div class="flex items-center bg-slate-950 rounded-lg p-1 border border-slate-700">
+                            <button type="button" onclick="adminSiteKW--; if(adminSiteKW<1){adminSiteYear--;adminSiteKW=52;} renderAdminSelectedSiteDetails();" class="px-2.5 py-1 hover:bg-slate-800 rounded text-slate-300">
+                                <i class="fa-solid fa-chevron-left"></i>
+                            </button>
+                            <span class="px-3 text-xs font-bold text-indigo-400">KW ${adminSiteKW} (${adminSiteYear})</span>
+                            <button type="button" onclick="adminSiteKW++; if(adminSiteKW>52){adminSiteYear++;adminSiteKW=1;} renderAdminSelectedSiteDetails();" class="px-2.5 py-1 hover:bg-slate-800 rounded text-slate-300">
+                                <i class="fa-solid fa-chevron-right"></i>
+                            </button>
+                        </div>
+
+                        ${isSignedByKunde ? `
+                            <button type="button" onclick="deleteKundeSignatureByAdmin('${escapeHtml(selectedAdminSiteProject)}', '${weekKey}')" class="bg-red-950 hover:bg-red-900 text-red-200 border border-red-700 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition" title="Obriši potpis Baulaiter AG i otključaj sate za vodju delovišča">
+                                <i class="fa-solid fa-trash-can"></i> Obriši potpis Baulaiter AG
+                            </button>
+                        ` : ''}
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-1.5 text-xs">
+                        <button type="button" onclick="adminSiteFilterStatus='all'; renderAdminSelectedSiteDetails();" class="px-3 py-1.5 rounded-lg font-bold border ${adminSiteFilterStatus==='all' ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-slate-900 text-slate-300 border-slate-700'}">
+                            Svi (${reportRows.length})
+                        </button>
+                        <button type="button" onclick="adminSiteFilterStatus='signed'; renderAdminSelectedSiteDetails();" class="px-3 py-1.5 rounded-lg font-bold border ${adminSiteFilterStatus==='signed' ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-slate-900 text-slate-300 border-slate-700'}">
+                            Potpisani
+                        </button>
+                        <button type="button" onclick="adminSiteFilterStatus='unsigned'; renderAdminSelectedSiteDetails();" class="px-3 py-1.5 rounded-lg font-bold border ${adminSiteFilterStatus==='unsigned' ? 'bg-amber-600 text-white border-amber-500' : 'bg-slate-900 text-slate-300 border-slate-700'}">
+                            Nepotpisani
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    ${filteredRows.length === 0
+                        ? `<p class="text-xs text-slate-400 p-4 bg-slate-900/50 rounded-xl">Nema sati za odabrani filter i projekat <strong>${escapeHtml(selectedAdminSiteProject)}</strong> u KW ${adminSiteKW}.</p>`
+                        : `<table class="w-full text-left border-collapse min-w-[780px] text-xs">
+                            <thead>
+                                <tr class="bg-slate-900 text-slate-400 uppercase border-b border-slate-700">
+                                    <th class="p-2.5 text-center w-10">Nr.</th>
+                                    <th class="p-2.5">Name / Vorname</th>
+                                    <th class="p-2.5 text-center">Status</th>
+                                    <th class="p-2.5 text-center">Mon</th>
+                                    <th class="p-2.5 text-center">Die</th>
+                                    <th class="p-2.5 text-center">Mit</th>
+                                    <th class="p-2.5 text-center">Don</th>
+                                    <th class="p-2.5 text-center">Fre</th>
+                                    <th class="p-2.5 text-center">Sam</th>
+                                    <th class="p-2.5 text-center">Son</th>
+                                    <th class="p-2.5 text-center">Std. Summe</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-700/70">
+                                ${filteredRows.map((r, i) => `
+                                    <tr>
+                                        <td class="p-2.5 text-center font-bold text-slate-400">${i + 1}</td>
+                                        <td class="p-2.5 font-bold text-white">${escapeHtml(r.person.name)}</td>
+                                        <td class="p-2.5 text-center">
+                                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${r.signed ? 'bg-emerald-950 text-emerald-300 border border-emerald-700' : 'bg-amber-950 text-amber-300 border border-amber-700'}">
+                                                ${r.signed ? 'Potpisano' : 'Nepotpisano'}
+                                            </span>
+                                        </td>
+                                        ${daysOfWeek.map(d => `<td class="p-2.5 text-center font-semibold text-slate-200">${formatHoursHHMM(r.days[d.id].sum)}</td>`).join('')}
+                                        <td class="p-2.5 text-center font-extrabold text-emerald-300">${formatHoursHHMM(r.totalHours)}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>`
+                    }
+                </div>
+            `;
+        }
+
+        function updateSiteBaulajter(siteId, bauId) {
+            const site = appData.baustellen.find(s => s.id === siteId);
+            if (!site) return;
+            site.baulajterId = bauId;
+            if (bauId && !site.memberIds.includes(bauId)) {
+                site.memberIds.push(bauId);
+            }
+            saveData();
+            renderAdminBaustelleView();
+            showToast('Vodja delovišča je dodijeljen bausteli.');
+        }
+
+        function adminAddMemberToSite(siteId) {
+            const site = appData.baustellen.find(s => s.id === siteId);
+            const sel = document.getElementById('adminAddMemberToSiteSelect');
+            if (!site || !sel || !sel.value) return;
+            if (!site.memberIds.includes(sel.value)) {
+                site.memberIds.push(sel.value);
+                saveData();
+                renderAdminBaustelleView();
+                showToast('Osoba je dodana u grupu baustele.');
+            }
+        }
+
+        function adminRemoveMemberFromSite(siteId, userId) {
+            const site = appData.baustellen.find(s => s.id === siteId);
+            if (!site) return;
+            site.memberIds = (site.memberIds || []).filter(id => id !== userId);
+            saveData();
+            renderAdminBaustelleView();
+        }
+
+        function formatHoursHHMM(num) {
+            const val = Number(num) || 0;
+            const hrs = Math.floor(val);
+            const mins = Math.round((val - hrs) * 60);
+            return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+        }
+
+        function getWeekDateRangeStr(year, kw) {
+            const simple = new Date(Date.UTC(year, 0, 1 + (kw - 1) * 7));
+            const dow = simple.getUTCDay();
+            const monday = new Date(simple);
+            if (dow <= 4) monday.setUTCDate(simple.getUTCDate() - simple.getUTCDay() + 1);
+            else monday.setUTCDate(simple.getUTCDate() + 8 - simple.getUTCDay());
+            const sunday = new Date(monday);
+            sunday.setUTCDate(monday.getUTCDate() + 6);
+            const fmt = (d) => `${String(d.getUTCDate()).padStart(2, '0')}.${String(d.getUTCMonth() + 1).padStart(2, '0')}.${d.getUTCFullYear()}`;
+            return `${fmt(monday)} - ${fmt(sunday)}`;
+        }
+
+        function downloadScaraPdfForSite(siteId, filterMode = 'all') {
+            const site = appData.baustellen.find(s => s.id === siteId);
+            if (!site || !selectedAdminSiteProject) {
+                showToast('Odaberite baustellu i projekat za PDF.', true);
+                return;
+            }
+
+            const weekKey = getWeekKey(adminSiteYear, adminSiteKW);
+            const sigRecord = findSignatureRecordForProjectWeek(selectedAdminSiteProject, weekKey);
+            const isSignedByKunde = Boolean(sigRecord.kundeSignature);
+
+            if (filterMode === 'signed' && !isSignedByKunde) {
+                showToast(`Za projekat "${selectedAdminSiteProject}" u KW ${adminSiteKW} nema potpisanih sati (Baulaiter AG još nije potpisao).`, true);
+                return;
+            }
+
+            const candidateIds = new Set(site.memberIds || []);
+            appData.users.forEach(u => candidateIds.add(u.id));
+
+            const rows = [];
+            let kwTotalHours = 0;
+
+            candidateIds.forEach(personId => {
+                const person = appData.users.find(u => u.id === personId);
+                if (!person) return;
+                const weekRec = findWeekRecordForUser(person.id, weekKey);
+                if (!weekRec) return;
+
+                let hasAny = false;
+                let personSum = 0;
+                const dayData = {};
+
+                daysOfWeek.forEach(d => {
+                    const entry = weekRec[d.id];
+                    if (entry && entry.project === selectedAdminSiteProject) {
+                        const w = Number(entry.workHours) || 0;
+                        const t = Number(entry.travelHours) || 0;
+                        if (w > 0 || t > 0) hasAny = true;
+                        const dayTotal = w + t;
+                        personSum += dayTotal;
+                        dayData[d.id] = {
+                            delo: w,
+                            deloOstalo: t,
+                            odmor: w > 0 ? 0.5 : 0,
+                            sigma: dayTotal
+                        };
+                    } else {
+                        dayData[d.id] = { delo: 0, deloOstalo: 0, odmor: 0, sigma: 0 };
+                    }
+                });
+
+                if (hasAny) {
+                    const include =
+                        filterMode === 'all' ||
+                        (filterMode === 'signed' && isSignedByKunde) ||
+                        (filterMode === 'unsigned' && !isSignedByKunde);
+
+                    if (include) {
+                        kwTotalHours += personSum;
+                        rows.push({ person, dayData, personSum });
+                    }
+                }
+            });
+
+            if (rows.length === 0) {
+                showToast('Nema evidentiranih sati za odabrani filter u ovoj KW.', true);
+                return;
+            }
+
+            const bauUser = appData.users.find(u => u.id === site.baulajterId);
+            const dateRange = getWeekDateRangeStr(adminSiteYear, adminSiteKW);
+
+            const workerBlocksHtml = rows.map((r, idx) => `
+                <tr>
+                    <td rowspan="4" style="border:1px solid #334155; text-align:center; font-weight:700; padding:2px; vertical-align:middle;">${idx + 1}</td>
+                    <td rowspan="4" style="border:1px solid #334155; font-weight:700; padding:2px 4px; vertical-align:middle;">${escapeHtml(r.person.name)}</td>
+                    <td style="border:1px solid #334155; padding:1.5px 4px; font-size:9px;">Delo</td>
+                    ${daysOfWeek.map(d => `<td style="border:1px solid #334155; text-align:center; padding:1.5px; font-size:9px;">${formatHoursHHMM(r.dayData[d.id].delo)}</td>`).join('')}
+                    <td rowspan="4" style="border:1px solid #334155; text-align:center; font-weight:800; padding:2px; vertical-align:middle; font-size:10px;">${formatHoursHHMM(r.personSum)}</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #334155; padding:1.5px 4px; font-size:9px;">Delo ostalo</td>
+                    ${daysOfWeek.map(d => `<td style="border:1px solid #334155; text-align:center; padding:1.5px; font-size:9px;">${formatHoursHHMM(r.dayData[d.id].deloOstalo)}</td>`).join('')}
+                </tr>
+                <tr>
+                    <td style="border:1px solid #334155; padding:1.5px 4px; font-size:9px;">Odmor</td>
+                    ${daysOfWeek.map(d => `<td style="border:1px solid #334155; text-align:center; padding:1.5px; font-size:9px;">${formatHoursHHMM(r.dayData[d.id].odmor)}</td>`).join('')}
+                </tr>
+                <tr style="background:#f1f5f9; font-weight:700;">
+                    <td style="border:1px solid #334155; padding:1.5px 4px; font-size:9px;">Σ</td>
+                    ${daysOfWeek.map(d => `<td style="border:1px solid #334155; text-align:center; padding:1.5px; font-size:9px;">${formatHoursHHMM(r.dayData[d.id].sigma)}</td>`).join('')}
+                </tr>
+            `).join('');
+
+            const htmlDoc = `
+                <div style="padding:8px 10px; width:760px; box-sizing:border-box; font-family: Arial, sans-serif; color:#0f172a; background:#ffffff;">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #0f172a; padding-bottom:4px; margin-bottom:5px;">
+                        <div>
+                            <div style="font-size:15px; font-weight:900; letter-spacing:0.5px; color:#0f172a;">SCARA-Tec</div>
+                            <div style="font-size:8.5px; line-height:1.25; color:#334155;">
+                                <strong>SCARA-Tec d.o.o.</strong><br>
+                                Gozdna ulica 2 C, SI-2311 Hoče<br>
+                                PE: Slovenija vas 77, SI-2288 Hajdina
+                            </div>
+                        </div>
+                        <div style="text-align:right;">
+                            <div style="font-size:9.5px; font-weight:700; color:#334155;">${dateRange}</div>
+                            <div style="font-size:13px; font-weight:900; margin-top:1px;">STUNDENNACHWEIS KW: <span style="font-size:15px;">${adminSiteKW}</span></div>
+                        </div>
+                    </div>
+
+                    <table style="width:100%; border-collapse:collapse; margin-bottom:5px; font-size:9px;">
+                        <tr>
+                            <td style="border:1px solid #334155; padding:2.5px 6px; width:18%; font-weight:700; background:#f8fafc;">Auftraggeber:</td>
+                            <td style="border:1px solid #334155; padding:2.5px 6px; width:82%; font-weight:700;">${escapeHtml(site.company)}</td>
+                        </tr>
+                        <tr>
+                            <td style="border:1px solid #334155; padding:2.5px 6px; font-weight:700; background:#f8fafc;">Baustelle:</td>
+                            <td style="border:1px solid #334155; padding:2.5px 6px; font-weight:700;">${escapeHtml(site.location)}</td>
+                        </tr>
+                        <tr>
+                            <td style="border:1px solid #334155; padding:2.5px 6px; font-weight:700; background:#f8fafc;">Projekt:</td>
+                            <td style="border:1px solid #334155; padding:2.5px 6px; font-weight:700;">${escapeHtml(selectedAdminSiteProject)}</td>
+                        </tr>
+                    </table>
+
+                    <table style="width:100%; border-collapse:collapse; font-size:9px;">
+                        <thead>
+                            <tr style="background:#e2e8f0; font-weight:800;">
+                                <th style="border:1px solid #334155; padding:2.5px; width:24px; text-align:center;">Nr.</th>
+                                <th style="border:1px solid #334155; padding:2.5px; width:112px; text-align:left;">Name / Vorname</th>
+                                <th style="border:1px solid #334155; padding:2.5px; width:56px; text-align:left;">AZ</th>
+                                <th style="border:1px solid #334155; padding:2.5px; text-align:center;">Montag</th>
+                                <th style="border:1px solid #334155; padding:2.5px; text-align:center;">Deinstag</th>
+                                <th style="border:1px solid #334155; padding:2.5px; text-align:center;">Mittwoch</th>
+                                <th style="border:1px solid #334155; padding:2.5px; text-align:center;">Donnerstag</th>
+                                <th style="border:1px solid #334155; padding:2.5px; text-align:center;">Freitag</th>
+                                <th style="border:1px solid #334155; padding:2.5px; text-align:center;">Samstag</th>
+                                <th style="border:1px solid #334155; padding:2.5px; text-align:center;">Sonntag</th>
+                                <th style="border:1px solid #334155; padding:2.5px; width:56px; text-align:center;">Std. Summe</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${workerBlocksHtml}
+                        </tbody>
+                        <tfoot>
+                            <tr style="background:#e2e8f0; font-weight:900; font-size:9.5px;">
+                                <td colspan="10" style="border:1px solid #334155; padding:3px 6px; text-align:right;">KW Std. zusammen:</td>
+                                <td style="border:1px solid #334155; padding:3px; text-align:center;">${formatHoursHHMM(kwTotalHours)}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+
+                    <div style="display:flex; justify-content:space-between; gap:12px; margin-top:7px; font-size:9px; page-break-inside:avoid; break-inside:avoid;">
+                        <div style="flex:1; border:1px solid #334155; padding:5px 8px; min-height:58px;">
+                            <div style="font-weight:700; margin-bottom:2px;">Vodja delovišča Scara-Tec:</div>
+                            ${sigRecord.userSignature ? `<img src="${sigRecord.userSignature}" style="max-height:32px; display:block; margin-bottom:2px;">` : `<div style="height:26px;"></div>`}
+                            <div style="border-top:1px solid #94a3b8; padding-top:2px; color:#334155;">
+                                ${escapeHtml(sigRecord.userSignedBy || (bauUser ? bauUser.name : ''))}
+                            </div>
+                        </div>
+                        <div style="flex:1; border:1px solid #334155; padding:5px 8px; min-height:58px;">
+                            <div style="font-weight:700; margin-bottom:2px;">Baulaiter AG:</div>
+                            ${sigRecord.kundeSignature ? `<img src="${sigRecord.kundeSignature}" style="max-height:32px; display:block; margin-bottom:2px;">` : `<div style="height:26px;"></div>`}
+                            <div style="border-top:1px solid #94a3b8; padding-top:2px; color:#334155;">
+                                ${sigRecord.kundeSignature ? 'Potpisano (Baulaiter AG)' : 'Nije potpisano'}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top:6px; padding-top:3px; border-top:1px solid #94a3b8; font-size:7.5px; color:#475569; display:flex; justify-content:space-between; page-break-inside:avoid; break-inside:avoid;">
+                        <span>+386 (0) 59 77 915 • info@scara-tec.si • www.scara-tec.si</span>
+                        <span>TRR: SI56 0287 8026 3295 750 • SWIFT: LJBASI2X (NLB d.d.) • Matična št.: 8588163000 • ID za DDV: SI38769620</span>
+                    </div>
+                </div>
+            `;
+
+            renderPdfHtmlToFile(
+                htmlDoc,
+                `Stundennachweis_KW${adminSiteKW}_${site.location.replace(/\s+/g, '_')}_${filterMode}.pdf`
+            );
+        }
+
+        function togglePasswordVisibility(userId) {
+            visiblePasswordsMap[userId] = !visiblePasswordsMap[userId];
+            renderAdminDatabase();
+        }
+
+        function openEditCredentialsModal(userId) {
+            const user = appData.users.find(u => u.id === userId);
+            if (!user) return;
+            document.getElementById('editCredUserId').value = user.id;
+            const roleDisp = user.role === 'baulajter' ? 'VODJA DELOVIŠČA' : user.role.toUpperCase();
+            document.getElementById('editCredUserDisplay').innerText = `${user.name} (${roleDisp})`;
+            document.getElementById('editCredUsername').value = user.username || '';
+            document.getElementById('editCredPassword').value = user.password || '';
+            document.getElementById('editCredPhone').value = user.phone || '';
+            document.getElementById('editCredEmail').value = user.email || '';
+
+            const modal = document.getElementById('editCredentialsModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeEditCredentialsModal() {
+            const modal = document.getElementById('editCredentialsModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function renderAdminDatabase() {
+            const tbody = document.getElementById('adminUsersTableBody');
+            tbody.innerHTML = '';
+            document.getElementById('adminDbCountBadge').innerText = `${appData.users.length} korisnika`;
+
+            appData.users.forEach(user => {
+                const roleBadge = user.role === 'admin'
+                    ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-700">Administrator</span>`
+                    : user.role === 'baulajter'
+                        ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-700">Vodja delovišča</span>`
+                        : `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-950 text-indigo-300 border border-indigo-700">Radnik</span>`;
+
+                const isPassShown = visiblePasswordsMap[user.id] !== false;
+                const passDisplay = isPassShown
+                    ? `<span class="font-mono font-bold text-amber-300 bg-slate-900 px-2 py-0.5 rounded border border-slate-700">${escapeHtml(user.password || '')}</span>`
+                    : `<span class="font-mono text-slate-400">••••••••</span>`;
+
+                const roleActionBtn = user.role === 'radnik'
+                    ? `<button type="button" onclick="toggleUserRole('${user.id}')" class="px-2.5 py-1 bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-700 rounded-lg text-[11px] font-bold">Unaprijedi u Vodju delovišča</button>`
+                    : user.role === 'baulajter'
+                        ? `<button type="button" onclick="toggleUserRole('${user.id}')" class="px-2.5 py-1 bg-amber-950 hover:bg-amber-900 text-amber-300 border border-amber-700 rounded-lg text-[11px] font-bold">Vrati u Radnika</button>`
+                        : '';
+
+                const editCredBtn = `<button type="button" onclick="openEditCredentialsModal('${user.id}')" class="px-2.5 py-1 bg-indigo-950 hover:bg-indigo-900 text-indigo-300 border border-indigo-700 rounded-lg text-[11px] font-bold flex items-center gap-1" title="Uredi login i lozinku"><i class="fa-solid fa-key text-[10px]"></i> Uredi login</button>`;
+
+                const deleteBtn = user.id !== 'u_admin'
+                    ? `<button type="button" onclick="deleteUserFromDb('${user.id}', '${escapeHtml(user.name)}')" class="p-1.5 text-slate-400 hover:text-red-400 rounded-lg hover:bg-slate-700" title="Obriši"><i class="fa-solid fa-trash-can"></i></button>`
+                    : '';
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="p-3 font-bold text-white">${escapeHtml(user.name)}</td>
+                    <td class="p-3">${roleBadge}</td>
+                    <td class="p-3 font-mono font-semibold text-indigo-300">${escapeHtml(user.username)}</td>
+                    <td class="p-3">
+                        <div class="flex items-center gap-1.5">
+                            ${passDisplay}
+                            <button type="button" onclick="togglePasswordVisibility('${user.id}')" class="text-slate-400 hover:text-white p-1" title="${isPassShown ? 'Sakrij lozinku' : 'Prikaži lozinku'}">
+                                <i class="fa-solid ${isPassShown ? 'fa-eye-slash' : 'fa-eye'} text-[11px]"></i>
+                            </button>
+                        </div>
+                    </td>
+                    <td class="p-3 text-slate-300">${escapeHtml(user.phone || '-')}</td>
+                    <td class="p-3 text-slate-300">${escapeHtml(user.email || '-')}</td>
+                    <td class="p-3 text-right flex items-center justify-end gap-2">${editCredBtn}${roleActionBtn}${deleteBtn}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function toggleUserRole(userId) {
+            const user = appData.users.find(u => u.id === userId);
+            if (!user || user.role === 'admin') return;
+            user.role = user.role === 'radnik' ? 'baulajter' : 'radnik';
+            saveData();
+            renderAdminDatabase();
+            const newRoleLabel = user.role === 'baulajter' ? 'VODJA DELOVIŠČA' : 'RADNIK';
+            showToast(`Uloga korisnika ${user.name} je promijenjena u ${newRoleLabel}.`);
+        }
+
+        function deleteUserFromDb(userId, userName) {
+            showConfirmModal(
+                'Brisanje korisnika',
+                `Jeste li sigurni da želite obrisati korisnika "${userName}" iz baze podataka?`,
+                () => {
+                    appData.users = appData.users.filter(u => u.id !== userId);
+                    appData.baustellen.forEach(s => {
+                        s.memberIds = (s.memberIds || []).filter(id => id !== userId);
+                        if (s.baulajterId === userId) s.baulajterId = '';
+                    });
+                    saveData();
+                    renderAdminDatabase();
+                    renderAdminMonthlySearch();
+                    showToast(`Korisnik ${userName} je obrisan.`);
+                }
+            );
+        }
+
+        function renderAdminMonthlySearch() {
+            const container = document.getElementById('adminMonthlySearchResult');
+            const query = (document.getElementById('adminSearchPersonInput').value || '').trim().toLowerCase();
+            const monthVal = document.getElementById('adminMonthPicker').value;
+
+            const matches = appData.users.filter(u =>
+                (u.role === 'radnik' || u.role === 'baulajter') &&
+                (!query || u.name.toLowerCase().includes(query))
+            );
+
+            if (matches.length === 0) {
+                container.innerHTML = `<p class="text-xs text-slate-400">Nema pronađenih radnika ili vodja delovišča.</p>`;
+                return;
+            }
+
+            container.innerHTML = matches.map(u => buildMonthlyCardHtml(u, monthVal)).join('');
+        }
+
+        function buildMonthlyCardHtml(user, monthVal) {
+            if (!monthVal) return '';
+            const [yStr, mStr] = monthVal.split('-');
+            const year = parseInt(yStr, 10);
+            const month = parseInt(mStr, 10);
+            const daysInMonth = new Date(year, month, 0).getDate();
+
+            const dayKeys = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+            const dayLabels = ['Ned', 'Pon', 'Uto', 'Sri', 'Čet', 'Pet', 'Sub'];
+
+            let totalW = 0;
+            let totalT = 0;
+            let rowsHtml = '';
+
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dateObj = new Date(year, month - 1, d);
+                const kw = getKW(dateObj);
+                const isoYear = dateObj.getMonth() === 0 && kw >= 52 ? year - 1 : (dateObj.getMonth() === 11 && kw === 1 ? year + 1 : year);
+                const wkKey = getWeekKey(isoYear, kw);
+                const dowKey = dayKeys[dateObj.getDay()];
+                const rec = appData.timeRecords[user.id]?.[wkKey]?.[dowKey];
+
+                const w = rec ? (Number(rec.workHours) || 0) : 0;
+                const t = rec ? (Number(rec.travelHours) || 0) : 0;
+                const proj = rec?.project || '-';
+                totalW += w;
+                totalT += t;
+
+                rowsHtml += `
+                    <tr class="${w + t > 0 ? 'bg-slate-800/80' : 'text-slate-500'}">
+                        <td class="p-2 font-semibold">${String(d).padStart(2, '0')}.${String(month).padStart(2, '0')}.${year} (${dayLabels[dateObj.getDay()]})</td>
+                        <td class="p-2">KW ${kw}</td>
+                        <td class="p-2 text-emerald-300 font-medium">${escapeHtml(proj)}</td>
+                        <td class="p-2 text-center font-bold text-indigo-300">${w} h</td>
+                        <td class="p-2 text-center font-bold text-amber-300">${t} h</td>
+                        <td class="p-2 text-center font-extrabold text-white">${w + t} h</td>
+                    </tr>
+                `;
+            }
+
+            const roleDisp = user.role === 'baulajter' ? 'vodja delovišča' : user.role;
+
+            return `
+                <div class="bg-slate-900/90 border border-slate-700 rounded-xl overflow-hidden">
+                    <div class="p-3.5 bg-slate-950/70 border-b border-slate-700 flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <span class="text-sm font-extrabold text-white">${escapeHtml(user.name)}</span>
+                            <span class="ml-2 text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-slate-800 text-indigo-300">${roleDisp}</span>
+                        </div>
+                        <div class="flex items-center gap-3 text-xs font-bold">
+                            <span class="text-indigo-300">Radni (R): ${totalW}h</span>
+                            <span class="text-amber-300">Putni (P): ${totalT}h</span>
+                            <span class="text-emerald-400">Ukupno: ${totalW + totalT}h</span>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto max-h-80">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead class="sticky top-0 bg-slate-900 text-slate-400 uppercase border-b border-slate-700">
+                                <tr>
+                                    <th class="p-2">Datum</th>
+                                    <th class="p-2">KW</th>
+                                    <th class="p-2">Projekat</th>
+                                    <th class="p-2 text-center">Radni (R)</th>
+                                    <th class="p-2 text-center">Putni (P)</th>
+                                    <th class="p-2 text-center">Ukupno</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-800">${rowsHtml}</tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        function initBaulajterSiteSelector() {
+            const box = document.getElementById('bauSiteHeaderSelector');
+            const sel = document.getElementById('bauActiveSiteSelect');
+            if (!currentUser || currentUser.role !== 'baulajter') {
+                box.classList.add('hidden');
+                return;
+            }
+            const mySites = appData.baustellen.filter(s =>
+                s.baulajterId === currentUser.id || (s.memberIds || []).includes(currentUser.id)
+            );
+            if (mySites.length === 0) {
+                box.classList.add('hidden');
+                activeBauSiteId = '';
+                return;
+            }
+            box.classList.remove('hidden');
+            if (!activeBauSiteId || !mySites.some(s => s.id === activeBauSiteId)) {
+                activeBauSiteId = mySites[0].id;
+            }
+            sel.innerHTML = mySites.map(s => `<option value="${s.id}" ${s.id === activeBauSiteId ? 'selected' : ''}>${escapeHtml(s.location)}</option>`).join('');
+            sel.onchange = (e) => {
+                activeBauSiteId = e.target.value;
+                populateBaulajterSelect();
+                renderBaulajterTable();
+            };
+        }
+
+        function getActiveBaulajterSite() {
+            if (!currentUser) return null;
+            const mySites = appData.baustellen.filter(s =>
+                s.baulajterId === currentUser.id || (s.memberIds || []).includes(currentUser.id)
+            );
+            return mySites.find(s => s.id === activeBauSiteId) || mySites[0] || null;
+        }
+
+        function switchBaulajterView(tab) {
+            document.getElementById('directorySection').classList.add('hidden');
+            document.getElementById('baulajterSection').classList.remove('hidden');
+
+            document.getElementById('bauTabWeekly').classList.add('hidden');
+            document.getElementById('bauTabMyHours').classList.add('hidden');
+            document.getElementById('bauTabProjects').classList.add('hidden');
+
+            const kwGroup = document.getElementById('kwControlsGroup');
+            const todayBtn = document.getElementById('todayKwBtn');
+            const pdfBtn = document.getElementById('downloadPdfBtn');
+            const bauSiteBox = document.getElementById('bauSiteHeaderSelector');
+
+            if (tab === 'weekly') {
+                setActiveNavButton('navBauWeekly');
+                document.getElementById('bauTabWeekly').classList.remove('hidden');
+                kwGroup.classList.remove('hidden');
+                todayBtn.classList.remove('hidden');
+                pdfBtn.classList.remove('hidden');
+                initBaulajterSiteSelector();
+                updateKWDisplay();
+                populateBaulajterSelect();
+                renderBaulajterProjectsList();
+                renderBaulajterTable();
+            } else if (tab === 'myhours') {
+                setActiveNavButton('navBauMy');
+                document.getElementById('bauTabMyHours').classList.remove('hidden');
+                kwGroup.classList.add('hidden');
+                todayBtn.classList.add('hidden');
+                pdfBtn.classList.add('hidden');
+                bauSiteBox.classList.add('hidden');
+                const monthVal = document.getElementById('bauMyMonthPicker').value;
+                document.getElementById('bauMyMonthlyContent').innerHTML = buildMonthlyCardHtml(currentUser, monthVal);
+            } else {
+                setActiveNavButton('navBauProj');
+                document.getElementById('bauTabProjects').classList.remove('hidden');
+                kwGroup.classList.add('hidden');
+                todayBtn.classList.add('hidden');
+                pdfBtn.classList.add('hidden');
+                bauSiteBox.classList.add('hidden');
+                renderProjectReportSection('bauTabProjects');
+            }
+        }
+
+        function updateKWDisplay() {
+            document.getElementById('currentKwDisplay').innerText = `KW ${currentKW} (${currentYear})`;
+        }
+
+        function changeKW(delta) {
+            currentKW += delta;
+            if (currentKW < 1) {
+                currentYear--;
+                currentKW = 52;
+            } else if (currentKW > 52) {
+                currentYear++;
+                currentKW = 1;
+            }
+            updateKWDisplay();
+            renderBaulajterTable();
+        }
+
+        function renderBaulajterProjectsList() {
+            const container = document.getElementById('bauProjectsListContainer');
+            container.innerHTML = '';
+            if (appData.projects.length === 0) {
+                container.innerHTML = `<span class="text-[11px] text-slate-500 italic">Nema projekata.</span>`;
+                return;
+            }
+            appData.projects.forEach(p => {
+                const chip = document.createElement('span');
+                chip.className = 'inline-flex items-center gap-1 px-2 py-0.5 bg-slate-900 border border-slate-700 rounded text-[11px] text-emerald-400 font-medium';
+                chip.innerHTML = `<span>${escapeHtml(p)}</span><button type="button" onclick="deleteProjectFromList('${escapeHtml(p)}')" class="text-slate-500 hover:text-red-400"><i class="fa-solid fa-xmark"></i></button>`;
+                container.appendChild(chip);
+            });
+        }
+
+        function deleteProjectFromList(projName) {
+            appData.projects = appData.projects.filter(p => p !== projName);
+            saveData();
+            renderBaulajterProjectsList();
+            renderBaulajterTable();
+        }
+
+        function populateBaulajterSelect() {
+            const select = document.getElementById('bauAddPersonSelect');
+            if (!select || !currentUser) return;
+
+            const site = getActiveBaulajterSite();
+            const listKey = site ? `${currentUser.id}__${site.id}` : currentUser.id;
+            if (!Array.isArray(appData.bauLists[listKey])) {
+                appData.bauLists[listKey] = site ? [...(site.memberIds || [])] : [currentUser.id];
+            }
+            const currentList = appData.bauLists[listKey];
+
+            const allowedIds = site ? (site.memberIds || []) : [currentUser.id];
+            const allowedUsers = allowedIds
+                .map(id => appData.users.find(u => u.id === id))
+                .filter(Boolean)
+                .filter(u => !currentList.includes(u.id));
+
+            if (!site) {
+                select.innerHTML = `<option value="">-- Admin vam još nije dodijelio baustellu --</option>`;
+                return;
+            }
+
+            const optionsHtml = allowedUsers.map(u => {
+                if (u.id === currentUser.id) return `<option value="${u.id}">⭐ ${escapeHtml(u.name)} (Ja - Vodja delovišča)</option>`;
+                if (u.role === 'baulajter') return `<option value="${u.id}">🦺 ${escapeHtml(u.name)} (Vodja delovišča u grupi)</option>`;
+                return `<option value="${u.id}">👷 ${escapeHtml(u.name)} (Radnik u grupi)</option>`;
+            }).join('');
+
+            select.innerHTML = `<option value="">-- Izaberi iz grupe (${escapeHtml(site.location)}) --</option>${optionsHtml}`;
+        }
+
+        function addPersonToBaulajterList() {
+            const select = document.getElementById('bauAddPersonSelect');
+            const personId = select.value;
+            if (!personId || !currentUser) return;
+
+            const site = getActiveBaulajterSite();
+            if (!site || !(site.memberIds || []).includes(personId)) {
+                showToast('Možete dodati samo radnike iz vaše grupe na ovoj bausteli.', true);
+                return;
+            }
+
+            const listKey = `${currentUser.id}__${site.id}`;
+            if (!Array.isArray(appData.bauLists[listKey])) appData.bauLists[listKey] = [];
+            if (!appData.bauLists[listKey].includes(personId)) {
+                appData.bauLists[listKey].push(personId);
+                saveData();
+                populateBaulajterSelect();
+                renderBaulajterTable();
+                showToast('Osoba iz grupe je dodana na spisak sati.');
+            }
+        }
+
+        function removePersonFromBaulajterList(personId) {
+            if (!currentUser) return;
+            const wkKey = getWeekKey(currentYear, currentKW);
+            const weekRec = findWeekRecordForUser(personId, wkKey);
+            if (weekRec) {
+                const lockedProj = Object.values(weekRec).map(d => d?.project).find(p => p && isDayLockedByKunde(p));
+                if (lockedProj) {
+                    showToast(`Projekat "${lockedProj}" u ${wkKey} je potpisao Baulaiter AG i zaključan je za vodju delovišča.`, true);
+                    return;
+                }
+            }
+            const site = getActiveBaulajterSite();
+            const listKey = site ? `${currentUser.id}__${site.id}` : currentUser.id;
+            appData.bauLists[listKey] = (appData.bauLists[listKey] || []).filter(id => id !== personId);
+            saveData();
+            populateBaulajterSelect();
+            renderBaulajterTable();
+        }
+
+        function getDayRecord(personId, dayId) {
+            const wkKey = getWeekKey(currentYear, currentKW);
+            if (!appData.timeRecords[personId]) appData.timeRecords[personId] = {};
+            if (!appData.timeRecords[personId][wkKey]) appData.timeRecords[personId][wkKey] = {};
+            if (!appData.timeRecords[personId][wkKey][dayId]) {
+                appData.timeRecords[personId][wkKey][dayId] = { project: '', workHours: 0, travelHours: 0 };
+            }
+            return appData.timeRecords[personId][wkKey][dayId];
+        }
+
+        function isDayLockedByKunde(projectName) {
+            if (!projectName) return false;
+            const wkKey = getWeekKey(currentYear, currentKW);
+            return Boolean(findSignatureRecordForProjectWeek(projectName, wkKey)?.kundeSignature);
+        }
+
+        function updateBauDayProject(personId, dayId, projVal) {
+            const rec = getDayRecord(personId, dayId);
+            if (isDayLockedByKunde(rec.project)) {
+                showToast('Ovi sati su potpisani od strane Baulaiter AG i zaključani su.', true);
+                renderBaulajterTable();
+                return;
+            }
+            if (projVal && isDayLockedByKunde(projVal)) {
+                showToast(`Projekat "${projVal}" u ovoj KW je već potpisao Baulaiter AG i zaključan je.`, true);
+                renderBaulajterTable();
+                return;
+            }
+            rec.project = projVal;
+            if (projVal && rec.workHours === 0 && rec.travelHours === 0) {
+                rec.workHours = 10;
+            }
+            saveData();
+            renderBaulajterTable();
+        }
+
+        function toggleBauQuickHours(personId, dayId, type) {
+            const rec = getDayRecord(personId, dayId);
+            if (isDayLockedByKunde(rec.project)) {
+                showToast('Zaključano nakon potpisa Baulaiter AG.', true);
+                return;
+            }
+            if (type === 'work') rec.workHours = rec.workHours === 10 ? 0 : 10;
+            else rec.travelHours = rec.travelHours === 10 ? 0 : 10;
+            saveData();
+            renderBaulajterTable();
+        }
+
+        function updateBauCustomHours(personId, dayId, type, valStr) {
+            const rec = getDayRecord(personId, dayId);
+            if (isDayLockedByKunde(rec.project)) {
+                showToast('Zaključano nakon potpisa Baulaiter AG.', true);
+                renderBaulajterTable();
+                return;
+            }
+            const num = parseFloat(valStr);
+            const finalVal = isNaN(num) ? 0 : num;
+            if (type === 'work') rec.workHours = finalVal;
+            else rec.travelHours = finalVal;
+            saveData();
+            renderBaulajterTable();
+        }
+
+        function renderBaulajterTable() {
+            const tbody = document.getElementById('bauTableBody');
+            const emptyMsg = document.getElementById('bauEmptyMessage');
+            tbody.innerHTML = '';
+
+            const site = getActiveBaulajterSite();
+            document.getElementById('bauCurrentSiteLabel').innerText = site ? `Baustelle: ${site.location}` : 'Nema baustele';
+
+            const listKey = site ? `${currentUser.id}__${site.id}` : currentUser.id;
+            if (site && !Array.isArray(appData.bauLists[listKey])) {
+                appData.bauLists[listKey] = [...(site.memberIds || [])];
+            }
+            const allowedSet = new Set(site ? (site.memberIds || []) : [currentUser.id]);
+            const listIds = (Array.isArray(appData.bauLists[listKey]) ? appData.bauLists[listKey] : [])
+                .filter(id => allowedSet.has(id));
+            const searchQ = (document.getElementById('bauSearchListInput').value || '').trim().toLowerCase();
+
+            const people = listIds
+                .map(id => appData.users.find(u => u.id === id))
+                .filter(Boolean)
+                .filter(u => !searchQ || u.name.toLowerCase().includes(searchQ));
+
+            document.getElementById('bauActiveListCount').innerText = people.length;
+
+            if (people.length === 0) {
+                emptyMsg.classList.remove('hidden');
+                document.getElementById('bauTotalWeeklyHours').innerText = '0 h';
+                document.getElementById('bauTotalWeeklyBreakdown').innerText = 'Radni: 0h | Putni: 0h';
+                return;
+            }
+            emptyMsg.classList.add('hidden');
+
+            let grandW = 0;
+            let grandT = 0;
+
+            people.forEach((person, idx) => {
+                let pWork = 0;
+                let pTravel = 0;
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-750/50 transition border-b border-slate-700/60';
+
+                let daysHtml = '';
+                daysOfWeek.forEach(d => {
+                    const rec = getDayRecord(person.id, d.id);
+                    pWork += rec.workHours;
+                    pTravel += rec.travelHours;
+                    const locked = isDayLockedByKunde(rec.project);
+
+                    const allProjs = new Set([...(site?.projects || []), ...appData.projects]);
+                    let projOptions = `<option value="">-- Bez projekta --</option>`;
+                    if (rec.project && !allProjs.has(rec.project)) {
+                        projOptions += `<option value="${escapeHtml(rec.project)}" selected>${escapeHtml(rec.project)}</option>`;
+                    }
+                    allProjs.forEach(p => {
+                        projOptions += `<option value="${escapeHtml(p)}" ${rec.project === p ? 'selected' : ''}>${escapeHtml(p)}</option>`;
+                    });
+
+                    daysHtml += `
+                        <td class="p-2 align-top border-l border-slate-700/60">
+                            <div class="flex flex-col gap-1.5">
+                                <select ${locked ? 'disabled' : ''} onchange="updateBauDayProject('${person.id}', '${d.id}', this.value)" class="project-select ${locked ? 'opacity-60 cursor-not-allowed' : ''}">
+                                    ${projOptions}
+                                </select>
+                                ${locked ? `<div class="text-[10px] font-bold text-emerald-400 text-center"><i class="fa-solid fa-lock"></i> Potpisano (AG)</div>` : ''}
+                                <div class="flex items-center justify-between gap-1 bg-indigo-950/40 p-1 rounded border border-indigo-900/50">
+                                    <button type="button" ${locked ? 'disabled' : ''} onclick="toggleBauQuickHours('${person.id}', '${d.id}', 'work')"
+                                        class="px-1.5 py-0.5 rounded text-[10px] font-bold border ${rec.workHours > 0 ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-slate-800 text-indigo-400 border-slate-700'} ${locked ? 'opacity-50 cursor-not-allowed' : ''}">
+                                        10h (R)
+                                    </button>
+                                    <div class="flex items-center">
+                                        <span class="text-[10px] font-bold text-indigo-400 mr-1">R:</span>
+                                        <input type="number" min="0" max="24" step="0.5" ${locked ? 'disabled' : ''} value="${rec.workHours}"
+                                            onchange="updateBauCustomHours('${person.id}', '${d.id}', 'work', this.value)"
+                                            class="w-10 text-xs text-center p-0.5 bg-slate-900 border border-indigo-900/60 rounded text-white ${locked ? 'opacity-50 cursor-not-allowed' : ''}">
+                                    </div>
+                                </div>
+                                <div class="flex items-center justify-between gap-1 bg-amber-950/40 p-1 rounded border border-amber-900/50">
+                                    <button type="button" ${locked ? 'disabled' : ''} onclick="toggleBauQuickHours('${person.id}', '${d.id}', 'travel')"
+                                        class="px-1.5 py-0.5 rounded text-[10px] font-bold border ${rec.travelHours > 0 ? 'bg-amber-600 text-white border-amber-500' : 'bg-slate-800 text-amber-400 border-slate-700'} ${locked ? 'opacity-50 cursor-not-allowed' : ''}">
+                                        10h (P)
+                                    </button>
+                                    <div class="flex items-center">
+                                        <span class="text-[10px] font-bold text-amber-400 mr-1">P:</span>
+                                        <input type="number" min="0" max="24" step="0.5" ${locked ? 'disabled' : ''} value="${rec.travelHours}"
+                                            onchange="updateBauCustomHours('${person.id}', '${d.id}', 'travel', this.value)"
+                                            class="w-10 text-xs text-center p-0.5 bg-slate-900 border border-amber-900/60 rounded text-white ${locked ? 'opacity-50 cursor-not-allowed' : ''}">
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    `;
+                });
+
+                grandW += pWork;
+                grandT += pTravel;
+                const pTotal = pWork + pTravel;
+                if (pTotal === 0) tr.classList.add('zero-hours-row');
+
+                const roleSub = person.role === 'baulajter'
+                    ? `<div class="text-[10px] font-bold text-emerald-400 uppercase mt-0.5">VODJA DELOVIŠČA</div>`
+                    : `<div class="text-[10px] text-slate-400 uppercase mt-0.5">Radnik</div>`;
+
+                tr.innerHTML = `
+                    <td class="p-3 font-bold text-center text-slate-400 align-top pt-4">
+                        <span class="row-number-text">${idx + 1}.</span>
+                        <span class="row-number"></span>
+                    </td>
+                    <td class="p-3 align-top pt-4">
+                        <div class="font-bold text-white">${escapeHtml(person.name)}</div>
+                        ${roleSub}
+                    </td>
+                    ${daysHtml}
+                    <td class="p-3 text-center align-middle border-l border-slate-700/60 bg-slate-900/30">
+                        <div class="flex flex-col gap-1 items-center">
+                            <span class="px-2 py-0.5 rounded text-xs font-bold bg-indigo-950 text-indigo-300 border border-indigo-800/60">R: ${pWork}h</span>
+                            <span class="px-2 py-0.5 rounded text-xs font-bold bg-amber-950 text-amber-300 border border-amber-800/60">P: ${pTravel}h</span>
+                            <span class="text-xs font-black text-white border-t border-slate-700 pt-1 w-full text-center mt-0.5">Ukupno: ${pTotal}h</span>
+                        </div>
+                    </td>
+                    <td class="p-3 text-center align-middle border-l border-slate-700/60 no-pdf">
+                        <button type="button" onclick="removePersonFromBaulajterList('${person.id}')" class="text-slate-500 hover:text-red-400 p-2 rounded-lg hover:bg-slate-700 transition" title="Ukloni sa spiska">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('bauTotalWeeklyHours').innerText = `${grandW + grandT} h`;
+            document.getElementById('bauTotalWeeklyBreakdown').innerText = `Radni: ${grandW}h | Putni: ${grandT}h`;
+        }
+
+        function downloadBaulajterWeeklyPDF() {
+            const pdfContainer = document.getElementById('pdfContent');
+            document.getElementById('pdfKwTitle').innerText = `Sedmica: KW ${currentKW} (${currentYear}. godina)`;
+            document.getElementById('pdfReportDate').innerText = new Date().toLocaleDateString('bs-BA');
+            document.getElementById('pdfTotalFooter').innerText = document.getElementById('bauTotalWeeklyBreakdown').innerText;
+
+            const opt = {
+                margin: [8, 8, 8, 8],
+                filename: `Evidencija_Sati_KW${currentKW}_${currentYear}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+            };
+
+            document.body.classList.add('pdf-mode');
+            html2pdf().set(opt).from(pdfContainer).save().then(() => {
+                document.body.classList.remove('pdf-mode');
+            }).catch(() => {
+                document.body.classList.remove('pdf-mode');
+            });
+        }
+
+        function renderProjectReportSection(containerId) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            if (!selectedReportProject && appData.projects.length > 0) {
+                selectedReportProject = appData.projects[0];
+            }
+
+            const wkKey = getWeekKey(reportYear, reportKW);
+            const sigData = findSignatureRecordForProjectWeek(selectedReportProject, wkKey);
+            const isKundeSigned = Boolean(sigData.kundeSignature);
+
+            const projectRows = [];
+            appData.users.forEach(u => {
+                const wRec = findWeekRecordForUser(u.id, wkKey);
+                if (!wRec) return;
+                let wSum = 0, tSum = 0;
+                daysOfWeek.forEach(d => {
+                    if (wRec[d.id]?.project === selectedReportProject) {
+                        wSum += Number(wRec[d.id].workHours) || 0;
+                        tSum += Number(wRec[d.id].travelHours) || 0;
+                    }
+                });
+                if (wSum + tSum > 0) {
+                    projectRows.push({ user: u, work: wSum, travel: tSum, total: wSum + tSum });
+                }
+            });
+
+            container.innerHTML = `
+                <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-lg space-y-5">
+                    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-700 pb-4">
+                        <div>
+                            <h2 class="text-base font-bold text-white">Sati po projektu (KW) i elektronski potpis</h2>
+                            <p class="text-xs text-slate-400">Odaberite projekat i sedmicu za pregled, potpis i preuzimanje PDF izvještaja (potpisani / nepotpisani)</p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <select onchange="selectedReportProject=this.value; renderProjectReportSection('${containerId}');" class="project-select min-w-[200px]">
+                                ${appData.projects.map(p => `<option value="${escapeHtml(p)}" ${p === selectedReportProject ? 'selected' : ''}>${escapeHtml(p)}</option>`).join('')}
+                            </select>
+                            <div class="flex items-center bg-slate-900 rounded-xl p-1 border border-slate-700">
+                                <button type="button" onclick="reportKW--; if(reportKW<1){reportYear--;reportKW=52;} renderProjectReportSection('${containerId}');" class="px-2.5 py-1 hover:bg-slate-800 rounded text-slate-300"><i class="fa-solid fa-chevron-left"></i></button>
+                                <span class="px-3 text-xs font-bold text-indigo-400">KW ${reportKW} (${reportYear})</span>
+                                <button type="button" onclick="reportKW++; if(reportKW>52){reportYear++;reportKW=1;} renderProjectReportSection('${containerId}');" class="px-2.5 py-1 hover:bg-slate-800 rounded text-slate-300"><i class="fa-solid fa-chevron-right"></i></button>
+                            </div>
+                            <button type="button" onclick="downloadScaraPdfForProject('${escapeHtml(selectedReportProject)}', 'all')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 rounded-xl text-xs font-bold shadow flex items-center gap-1.5 transition">
+                                <i class="fa-solid fa-file-pdf"></i> PDF Svi
+                            </button>
+                            <button type="button" onclick="downloadScaraPdfForProject('${escapeHtml(selectedReportProject)}', 'signed')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-xl text-xs font-bold shadow flex items-center gap-1.5 transition">
+                                <i class="fa-solid fa-file-signature"></i> PDF Potpisani
+                            </button>
+                            <button type="button" onclick="downloadScaraPdfForProject('${escapeHtml(selectedReportProject)}', 'unsigned')" class="bg-amber-600 hover:bg-amber-500 text-white px-3 py-2 rounded-xl text-xs font-bold shadow flex items-center gap-1.5 transition">
+                                <i class="fa-solid fa-clock"></i> PDF Nepotpisani
+                            </button>
+                        </div>
+                    </div>
+
+                    ${projectRows.length === 0
+                        ? `<p class="text-xs text-slate-400">Nema evidentiranih sati za projekat <strong>${escapeHtml(selectedReportProject)}</strong> u KW ${reportKW}.</p>`
+                        : `<div class="space-y-3">
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left border-collapse text-xs">
+                                    <thead>
+                                        <tr class="bg-slate-900 text-slate-400 uppercase border-b border-slate-700">
+                                            <th class="p-3">#</th>
+                                            <th class="p-3">Ime i prezime</th>
+                                            <th class="p-3 text-center">Radni (R)</th>
+                                            <th class="p-3 text-center">Putni (P)</th>
+                                            <th class="p-3 text-center">Ukupno</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-700/70">
+                                        ${projectRows.map((r, i) => `
+                                            <tr>
+                                                <td class="p-3 font-bold text-slate-400">${i + 1}.</td>
+                                                <td class="p-3 font-bold text-white">${escapeHtml(r.user.name)}</td>
+                                                <td class="p-3 text-center text-indigo-300 font-bold">${r.work} h</td>
+                                                <td class="p-3 text-center text-amber-300 font-bold">${r.travel} h</td>
+                                                <td class="p-3 text-center text-emerald-400 font-extrabold">${r.total} h</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                    <tfoot>
+                                        <tr class="bg-slate-900/95 border-t-2 border-indigo-500/60 font-extrabold text-xs">
+                                            <td colspan="2" class="p-3 text-right text-slate-200 uppercase">Ukupno svi radnici (${escapeHtml(selectedReportProject)} • KW ${reportKW}):</td>
+                                            <td class="p-3 text-center text-indigo-300">${projectRows.reduce((s, r) => s + r.work, 0)} h</td>
+                                            <td class="p-3 text-center text-amber-300">${projectRows.reduce((s, r) => s + r.travel, 0)} h</td>
+                                            <td class="p-3 text-center text-emerald-400 text-sm">${projectRows.reduce((s, r) => s + r.total, 0)} h</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>`
+                    }
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                        <div class="bg-slate-900/80 p-4 rounded-xl border ${sigData.userSignature ? 'border-indigo-600' : 'border-slate-700'} space-y-3">
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="text-xs font-bold uppercase text-indigo-300">Potpis Vodje delovišča / Admina</span>
+                                <button type="button" onclick="openSignatureModal('${escapeHtml(selectedReportProject)}', '${wkKey}', 'bau', '${containerId}')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold">
+                                    Potpiši sate
+                                </button>
+                            </div>
+                            ${sigData.userSignature
+                                ? `<img src="${sigData.userSignature}" class="bg-white rounded-lg max-h-24 p-1"><p class="text-[11px] font-bold text-indigo-300">Potpisao: ${escapeHtml(sigData.userSignedBy || '')}</p>`
+                                : `<p class="text-xs text-slate-400 italic">Prvo potpišite sate kako biste otključali potpis Baulaiter AG.</p>`
+                            }
+                        </div>
+
+                        <div class="bg-slate-900/80 p-4 rounded-xl border ${isKundeSigned ? 'border-emerald-600' : 'border-slate-700'} space-y-3">
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="text-xs font-bold uppercase text-emerald-300">Potpis Baulaiter AG</span>
+                                <button type="button" ${!sigData.userSignature ? 'disabled' : ''} onclick="handleKundeSignatureClick('${escapeHtml(selectedReportProject)}', '${wkKey}', '${containerId}')"
+                                    class="px-3 py-1.5 rounded-lg text-xs font-bold transition ${sigData.userSignature ? 'bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer' : 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed'}">
+                                    ${sigData.userSignature ? 'Potpis Baulaiter AG' : 'Zaključano (čeka vodju delovišča)'}
+                                </button>
+                            </div>
+                            ${sigData.kundeSignature
+                                ? `<img src="${sigData.kundeSignature}" class="bg-white rounded-lg max-h-24 p-1"><p class="text-[11px] font-bold text-emerald-400"><i class="fa-solid fa-lock"></i> Sati su potpisani i zaključani za uređivanje</p>`
+                                : `<p class="text-xs text-slate-500 italic">${sigData.userSignature ? 'Kliknite da odaberete njemački ili slovenski jezik i potpišete' : 'Otključava se nakon potpisa vodje delovišča'}</p>`
+                            }
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        let pendingKundeSignatureContext = null;
+
+        function handleKundeSignatureClick(projectName, weekKey, refreshContainerId) {
+            const sigRecord = findSignatureRecordForProjectWeek(projectName, weekKey);
+            if (!sigRecord.userSignature) {
+                showToast('Vodja delovišča mora prvo potpisati sate prije potpisa Baulaiter AG.', true);
+                return;
+            }
+            pendingKundeSignatureContext = { projectName, weekKey, refreshContainerId };
+            const modal = document.getElementById('kundeLangModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeKundeLangModal() {
+            const modal = document.getElementById('kundeLangModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function getSignatureContextInfo(projectName, weekKey) {
+            const matchingSite = appData.baustellen.find(s =>
+                (Array.isArray(s.projects) && s.projects.includes(projectName)) ||
+                (currentUser && (s.baulajterId === currentUser.id || (s.memberIds || []).includes(currentUser.id)))
+            );
+            const myCompany = 'SCARA-Tec d.o.o. (Gozdna ulica 2 C, SI-2311 Hoče)';
+            const siteLocation = matchingSite ? matchingSite.location : (projectName || '-');
+            const clientCompany = matchingSite ? matchingSite.company : 'Auftraggeber';
+
+            const rows = [];
+            appData.users.forEach(u => {
+                const wRec = findWeekRecordForUser(u.id, weekKey);
+                if (!wRec) return;
+                let wSum = 0, tSum = 0;
+                daysOfWeek.forEach(d => {
+                    if (wRec[d.id]?.project === projectName) {
+                        wSum += Number(wRec[d.id].workHours) || 0;
+                        tSum += Number(wRec[d.id].travelHours) || 0;
+                    }
+                });
+                if (wSum + tSum > 0) {
+                    rows.push({ name: u.name, work: wSum, travel: tSum, total: wSum + tSum });
+                }
+            });
+
+            return { myCompany, siteLocation, clientCompany, rows };
+        }
+
+        function renderKundeSignatureLanguageDetails(lang) {
+            if (!activeSignatureTarget || activeSignatureTarget.signerType !== 'kunde') return;
+            activeSignatureTarget.lang = lang;
+            const info = getSignatureContextInfo(activeSignatureTarget.projectName, activeSignatureTarget.weekKey);
+
+            const isDe = lang === 'de';
+            const lblMyCompany = isDe ? 'Unser Unternehmen:' : 'Naše podjetje:';
+            const lblSite = isDe ? 'Baustelle / Ort:' : 'Gradbišče / Kraj:';
+            const lblClient = isDe ? 'Auftraggeber (Kunde):' : 'Naročnik / Podjetje:';
+            const lblExplanation = isDe
+                ? `Bestätigung der geleisteten Arbeits- und Reisezeiten für Projekt ${activeSignatureTarget.projectName} (${activeSignatureTarget.weekKey}).`
+                : `Potrditev opravljenih delovnih in potnih ur za projekt ${activeSignatureTarget.projectName} (${activeSignatureTarget.weekKey}).`;
+            const lblWorker = isDe ? 'Mitarbeiter' : 'Delavec';
+            const lblWork = isDe ? 'Arbeit (R)' : 'Delo (R)';
+            const lblTravel = isDe ? 'Reise (P)' : 'Pot (P)';
+            const lblSum = isDe ? 'Summe' : 'Skupaj';
+            const lblTotal = isDe ? 'Gesamtsumme' : 'Skupaj vse ure';
+
+            document.getElementById('signatureModalTitle').innerText = isDe
+                ? 'Elektronische Unterschrift — Baulaiter AG'
+                : 'Elektronski podpis — Baulaiter AG';
+            document.getElementById('signatureModalSubtitle').innerText = lblExplanation;
+            document.getElementById('sigLangBadge').innerText = isDe ? 'DEUTSCH (DE)' : 'SLOVENŠČINA (SL)';
+            document.getElementById('sigClearBtn').innerText = isDe ? 'Unterschrift löschen' : 'Počisti podpis';
+            document.getElementById('sigCancelBtn').innerText = isDe ? 'Abbrechen' : 'Prekliči';
+            document.getElementById('sigSaveBtn').innerText = isDe ? 'Unterschrift speichern' : 'Shrani podpis';
+
+            document.getElementById('sigCompanyMetaGrid').innerHTML = `
+                <div class="bg-slate-800/90 border border-slate-700 rounded-lg p-2.5">
+                    <div class="text-[10px] font-bold uppercase text-slate-400">${lblMyCompany}</div>
+                    <div class="font-bold text-white mt-0.5">${escapeHtml(info.myCompany)}</div>
+                </div>
+                <div class="bg-slate-800/90 border border-slate-700 rounded-lg p-2.5">
+                    <div class="text-[10px] font-bold uppercase text-slate-400">${lblSite}</div>
+                    <div class="font-bold text-emerald-300 mt-0.5">${escapeHtml(info.siteLocation)}</div>
+                </div>
+                <div class="bg-slate-800/90 border border-slate-700 rounded-lg p-2.5">
+                    <div class="text-[10px] font-bold uppercase text-slate-400">${lblClient}</div>
+                    <div class="font-bold text-indigo-300 mt-0.5">${escapeHtml(info.clientCompany)}</div>
+                </div>
+            `;
+
+            const totalAll = info.rows.reduce((acc, r) => acc + r.total, 0);
+            document.getElementById('sigHoursPreviewContainer').innerHTML = `
+                <table class="w-full text-left border-collapse text-[11px]">
+                    <thead class="bg-slate-950 text-slate-300 border-b border-slate-800">
+                        <tr>
+                            <th class="p-2">${lblWorker}</th>
+                            <th class="p-2 text-center">${lblWork}</th>
+                            <th class="p-2 text-center">${lblTravel}</th>
+                            <th class="p-2 text-center">${lblSum}</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800">
+                        ${info.rows.length
+                            ? info.rows.map(r => `
+                                <tr>
+                                    <td class="p-2 font-semibold text-white">${escapeHtml(r.name)}</td>
+                                    <td class="p-2 text-center text-indigo-300">${r.work} h</td>
+                                    <td class="p-2 text-center text-amber-300">${r.travel} h</td>
+                                    <td class="p-2 text-center font-bold text-emerald-300">${r.total} h</td>
+                                </tr>
+                            `).join('')
+                            : `<tr><td colspan="4" class="p-2 text-center text-slate-400">${isDe ? 'Keine Stunden erfasst.' : 'Ni zabeleženih ur.'}</td></tr>`
+                        }
+                    </tbody>
+                    <tfoot class="bg-slate-950 font-bold text-emerald-400 border-t border-slate-800">
+                        <tr>
+                            <td colspan="3" class="p-2 text-right">${lblTotal}:</td>
+                            <td class="p-2 text-center">${totalAll} h</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            `;
+        }
+
+        function openSignatureModal(projectName, weekKey, signerType, refreshContainerId, lang = 'de') {
+            if (!projectName) {
+                showToast('Odaberite projekat prije potpisivanja.', true);
+                return;
+            }
+            activeSignatureTarget = { projectName, weekKey, signerType, refreshContainerId, lang };
+            const contextBox = document.getElementById('signatureContextBox');
+
+            if (signerType === 'kunde') {
+                contextBox.classList.remove('hidden');
+                renderKundeSignatureLanguageDetails(lang);
+            } else {
+                contextBox.classList.add('hidden');
+                document.getElementById('signatureModalTitle').innerText = 'Elektronski potpis — Vodja delovišča / Admin';
+                document.getElementById('signatureModalSubtitle').innerText = `Potvrda sati za projekat ${projectName} (${weekKey})`;
+                document.getElementById('sigClearBtn').innerText = 'Očisti potpis';
+                document.getElementById('sigCancelBtn').innerText = 'Odustani';
+                document.getElementById('sigSaveBtn').innerText = 'Sačuvaj potpis';
+            }
+
+            const modal = document.getElementById('signatureModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+
+            const canvas = document.getElementById('signatureCanvas');
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width || 440;
+            canvas.height = rect.height || 176;
+            clearSignaturePad();
+        }
+
+        function closeSignatureModal() {
+            activeSignatureTarget = null;
+            const modal = document.getElementById('signatureModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function clearSignaturePad() {
+            const canvas = document.getElementById('signatureCanvas');
+            const ctx = canvas.getContext('2d');
+            ctx.save();
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.restore();
+            ctx.lineWidth = 2.5;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.strokeStyle = '#0f172a';
+            hasDrawnSig = false;
+        }
+
+        function downloadScaraPdfForProject(projectName, filterMode = 'all') {
+            if (!projectName) {
+                showToast('Odaberite projekat za PDF.', true);
+                return;
+            }
+
+            const matchingSite = appData.baustellen.find(s =>
+                (Array.isArray(s.projects) && s.projects.includes(projectName)) ||
+                (currentUser && (s.baulajterId === currentUser.id || (s.memberIds || []).includes(currentUser.id)))
+            );
+
+            const wkKey = getWeekKey(reportYear, reportKW);
+            const sigRecord = findSignatureRecordForProjectWeek(projectName, wkKey);
+            const isSignedByKunde = Boolean(sigRecord.kundeSignature);
+
+            if (filterMode === 'signed' && !isSignedByKunde) {
+                showToast(`Za projekat "${projectName}" u KW ${reportKW} nema potpisanih sati (Baulaiter AG još nije potpisao).`, true);
+                return;
+            }
+
+            const candidateIds = new Set(appData.users.map(u => u.id));
+            if (matchingSite && Array.isArray(matchingSite.memberIds) && matchingSite.memberIds.length > 0) {
+                matchingSite.memberIds.forEach(id => candidateIds.add(id));
+            }
+
+            const rows = [];
+            let kwTotalHours = 0;
+
+            candidateIds.forEach(personId => {
+                const person = appData.users.find(u => u.id === personId);
+                if (!person) return;
+                const weekRec = findWeekRecordForUser(person.id, wkKey);
+                if (!weekRec) return;
+
+                let hasAny = false;
+                let personSum = 0;
+                const dayData = {};
+
+                daysOfWeek.forEach(d => {
+                    const entry = weekRec[d.id];
+                    if (entry && entry.project === projectName) {
+                        const w = Number(entry.workHours) || 0;
+                        const t = Number(entry.travelHours) || 0;
+                        if (w > 0 || t > 0) hasAny = true;
+                        const dayTotal = w + t;
+                        personSum += dayTotal;
+                        dayData[d.id] = {
+                            delo: w,
+                            deloOstalo: t,
+                            odmor: w > 0 ? 0.5 : 0,
+                            sigma: dayTotal
+                        };
+                    } else {
+                        dayData[d.id] = { delo: 0, deloOstalo: 0, odmor: 0, sigma: 0 };
+                    }
+                });
+
+                if (hasAny) {
+                    const include =
+                        filterMode === 'all' ||
+                        (filterMode === 'signed' && isSignedByKunde) ||
+                        (filterMode === 'unsigned' && !isSignedByKunde);
+
+                    if (include) {
+                        kwTotalHours += personSum;
+                        rows.push({ person, dayData, personSum });
+                    }
+                }
+            });
+
+            if (rows.length === 0) {
+                showToast('Nema evidentiranih sati za odabrani filter i projekat u KW ' + reportKW + '.', true);
+                return;
+            }
+
+            const siteLocation = matchingSite ? matchingSite.location : (currentUser?.name || '');
+            const siteCompany = matchingSite ? matchingSite.company : 'SCARA-Tec d.o.o.';
+            const bauUser = matchingSite ? appData.users.find(u => u.id === matchingSite.baulajterId) : currentUser;
+            const dateRange = getWeekDateRangeStr(reportYear, reportKW);
+
+            const workerBlocksHtml = rows.map((r, idx) => `
+                <tr>
+                    <td rowspan="4" style="border:1px solid #334155; text-align:center; font-weight:700; padding:2px; vertical-align:middle;">${idx + 1}</td>
+                    <td rowspan="4" style="border:1px solid #334155; font-weight:700; padding:2px 4px; vertical-align:middle;">${escapeHtml(r.person.name)}</td>
+                    <td style="border:1px solid #334155; padding:1.5px 4px; font-size:9px;">Delo</td>
+                    ${daysOfWeek.map(d => `<td style="border:1px solid #334155; text-align:center; padding:1.5px; font-size:9px;">${formatHoursHHMM(r.dayData[d.id].delo)}</td>`).join('')}
+                    <td rowspan="4" style="border:1px solid #334155; text-align:center; font-weight:800; padding:2px; vertical-align:middle; font-size:10px;">${formatHoursHHMM(r.personSum)}</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #334155; padding:1.5px 4px; font-size:9px;">Delo ostalo</td>
+                    ${daysOfWeek.map(d => `<td style="border:1px solid #334155; text-align:center; padding:1.5px; font-size:9px;">${formatHoursHHMM(r.dayData[d.id].deloOstalo)}</td>`).join('')}
+                </tr>
+                <tr>
+                    <td style="border:1px solid #334155; padding:1.5px 4px; font-size:9px;">Odmor</td>
+                    ${daysOfWeek.map(d => `<td style="border:1px solid #334155; text-align:center; padding:1.5px; font-size:9px;">${formatHoursHHMM(r.dayData[d.id].odmor)}</td>`).join('')}
+                </tr>
+                <tr style="background:#f1f5f9; font-weight:700;">
+                    <td style="border:1px solid #334155; padding:1.5px 4px; font-size:9px;">Σ</td>
+                    ${daysOfWeek.map(d => `<td style="border:1px solid #334155; text-align:center; padding:1.5px; font-size:9px;">${formatHoursHHMM(r.dayData[d.id].sigma)}</td>`).join('')}
+                </tr>
+            `).join('');
+
+            const htmlDoc = `
+                <div style="padding:8px 10px; width:760px; box-sizing:border-box; font-family: Arial, sans-serif; color:#0f172a; background:#ffffff;">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #0f172a; padding-bottom:4px; margin-bottom:5px;">
+                        <div>
+                            <div style="font-size:15px; font-weight:900; letter-spacing:0.5px; color:#0f172a;">SCARA-Tec</div>
+                            <div style="font-size:8.5px; line-height:1.25; color:#334155;">
+                                <strong>SCARA-Tec d.o.o.</strong><br>
+                                Gozdna ulica 2 C, SI-2311 Hoče<br>
+                                PE: Slovenija vas 77, SI-2288 Hajdina
+                            </div>
+                        </div>
+                        <div style="text-align:right;">
+                            <div style="font-size:9.5px; font-weight:700; color:#334155;">${dateRange}</div>
+                            <div style="font-size:13px; font-weight:900; margin-top:1px;">STUNDENNACHWEIS KW: <span style="font-size:15px;">${reportKW}</span></div>
+                        </div>
+                    </div>
+
+                    <table style="width:100%; border-collapse:collapse; margin-bottom:5px; font-size:9px;">
+                        <tr>
+                            <td style="border:1px solid #334155; padding:2.5px 6px; width:18%; font-weight:700; background:#f8fafc;">Auftraggeber:</td>
+                            <td style="border:1px solid #334155; padding:2.5px 6px; width:82%; font-weight:700;">${escapeHtml(siteCompany)}</td>
+                        </tr>
+                        <tr>
+                            <td style="border:1px solid #334155; padding:2.5px 6px; font-weight:700; background:#f8fafc;">Baustelle:</td>
+                            <td style="border:1px solid #334155; padding:2.5px 6px; font-weight:700;">${escapeHtml(siteLocation)}</td>
+                        </tr>
+                        <tr>
+                            <td style="border:1px solid #334155; padding:2.5px 6px; font-weight:700; background:#f8fafc;">Projekt:</td>
+                            <td style="border:1px solid #334155; padding:2.5px 6px; font-weight:700;">${escapeHtml(projectName)}</td>
+                        </tr>
+                    </table>
+
+                    <table style="width:100%; border-collapse:collapse; font-size:9px;">
+                        <thead>
+                            <tr style="background:#e2e8f0; font-weight:800;">
+                                <th style="border:1px solid #334155; padding:2.5px; width:24px; text-align:center;">Nr.</th>
+                                <th style="border:1px solid #334155; padding:2.5px; width:112px; text-align:left;">Name / Vorname</th>
+                                <th style="border:1px solid #334155; padding:2.5px; width:56px; text-align:left;">AZ</th>
+                                <th style="border:1px solid #334155; padding:2.5px; text-align:center;">Montag</th>
+                                <th style="border:1px solid #334155; padding:2.5px; text-align:center;">Deinstag</th>
+                                <th style="border:1px solid #334155; padding:2.5px; text-align:center;">Mittwoch</th>
+                                <th style="border:1px solid #334155; padding:2.5px; text-align:center;">Donnerstag</th>
+                                <th style="border:1px solid #334155; padding:2.5px; text-align:center;">Freitag</th>
+                                <th style="border:1px solid #334155; padding:2.5px; text-align:center;">Samstag</th>
+                                <th style="border:1px solid #334155; padding:2.5px; text-align:center;">Sonntag</th>
+                                <th style="border:1px solid #334155; padding:2.5px; width:56px; text-align:center;">Std. Summe</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${workerBlocksHtml}
+                        </tbody>
+                        <tfoot>
+                            <tr style="background:#e2e8f0; font-weight:900; font-size:9.5px;">
+                                <td colspan="10" style="border:1px solid #334155; padding:3px 6px; text-align:right;">KW Std. zusammen:</td>
+                                <td style="border:1px solid #334155; padding:3px; text-align:center;">${formatHoursHHMM(kwTotalHours)}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+
+                    <div style="display:flex; justify-content:space-between; gap:12px; margin-top:7px; font-size:9px; page-break-inside:avoid; break-inside:avoid;">
+                        <div style="flex:1; border:1px solid #334155; padding:5px 8px; min-height:58px;">
+                            <div style="font-weight:700; margin-bottom:2px;">Vodja delovišča Scara-Tec:</div>
+                            ${sigRecord.userSignature ? `<img src="${sigRecord.userSignature}" style="max-height:32px; display:block; margin-bottom:2px;">` : `<div style="height:26px;"></div>`}
+                            <div style="border-top:1px solid #94a3b8; padding-top:2px; color:#334155;">
+                                ${escapeHtml(sigRecord.userSignedBy || (bauUser ? bauUser.name : ''))}
+                            </div>
+                        </div>
+                        <div style="flex:1; border:1px solid #334155; padding:5px 8px; min-height:58px;">
+                            <div style="font-weight:700; margin-bottom:2px;">Baulaiter AG:</div>
+                            ${sigRecord.kundeSignature ? `<img src="${sigRecord.kundeSignature}" style="max-height:32px; display:block; margin-bottom:2px;">` : `<div style="height:26px;"></div>`}
+                            <div style="border-top:1px solid #94a3b8; padding-top:2px; color:#334155;">
+                                ${sigRecord.kundeSignature ? 'Potpisano (Baulaiter AG)' : 'Nije potpisano'}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top:6px; padding-top:3px; border-top:1px solid #94a3b8; font-size:7.5px; color:#475569; display:flex; justify-content:space-between; page-break-inside:avoid; break-inside:avoid;">
+                        <span>+386 (0) 59 77 915 • info@scara-tec.si • www.scara-tec.si</span>
+                        <span>TRR: SI56 0287 8026 3295 750 • SWIFT: LJBASI2X (NLB d.d.) • Matična št.: 8588163000 • ID za DDV: SI38769620</span>
+                    </div>
+                </div>
+            `;
+
+            renderPdfHtmlToFile(
+                htmlDoc,
+                `Stundennachweis_KW${reportKW}_${projectName.replace(/\s+/g, '_')}_${filterMode}.pdf`
+            );
+        }
+
+        function saveSignatureFromPad() {
+            if (!activeSignatureTarget || !hasDrawnSig) {
+                showToast('Molimo unesite potpis prije čuvanja.', true);
+                return;
+            }
+            const canvas = document.getElementById('signatureCanvas');
+            const dataUrl = canvas.toDataURL('image/png');
+            const sigKey = `${activeSignatureTarget.projectName}__${activeSignatureTarget.weekKey}`;
+            if (!appData.projectSignatures[sigKey]) appData.projectSignatures[sigKey] = {};
+
+            if (activeSignatureTarget.signerType === 'kunde') {
+                appData.projectSignatures[sigKey].kundeSignature = dataUrl;
+                appData.projectSignatures[sigKey].kundeSignedAt = new Date().toISOString();
+                appData.projectSignatures[sigKey].kundeLang = activeSignatureTarget.lang || 'de';
+            } else {
+                appData.projectSignatures[sigKey].userSignature = dataUrl;
+                appData.projectSignatures[sigKey].userSignedBy = currentUser ? currentUser.name : '';
+            }
+            saveData();
+            const targetContainer = activeSignatureTarget.refreshContainerId;
+            const wasKunde = activeSignatureTarget.signerType === 'kunde';
+            closeSignatureModal();
+            renderProjectReportSection(targetContainer);
+            if (wasKunde) {
+                showToast('Potpis Baulaiter AG je sačuvan. Sati za ovaj projekt i KW su zaključani.');
+            } else {
+                showToast('Potpis je uspješno sačuvan.');
+            }
+        }
+
+        function showConfirmModal(title, text, onConfirm) {
+            document.getElementById('confirmModalTitle').innerText = title;
+            document.getElementById('confirmModalText').innerText = text;
+            pendingConfirmCallback = onConfirm;
+            const modal = document.getElementById('confirmModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function hideConfirmModal() {
+            pendingConfirmCallback = null;
+            const modal = document.getElementById('confirmModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function showToast(msg, isError = false) {
+            const toast = document.getElementById('toastMessage');
+            toast.innerText = msg;
+            toast.className = `fixed bottom-5 right-5 z-50 px-4 py-3 rounded-xl shadow-2xl text-xs font-bold border ${
+                isError ? 'bg-red-950 text-red-200 border-red-700' : 'bg-slate-800 text-emerald-300 border-emerald-600'
+            }`;
+            toast.classList.remove('hidden');
+            clearTimeout(window._toastTimer);
+            window._toastTimer = setTimeout(() => toast.classList.add('hidden'), 3200);
+        }
+
+        function exportBackupJson() {
+            const blob = new Blob([JSON.stringify(appData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `evidencija_pro_kopija_${new Date().toISOString().slice(0, 10)}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            showToast('Sigurnosna kopija je preuzeta.');
+        }
+
+        function renderDirectory() {
+            const grid = document.getElementById('directoryCardsGrid');
+            if (!grid) return;
+            const query = (document.getElementById('directorySearchInput')?.value || '').trim().toLowerCase();
+
+            const list = appData.users.filter(u =>
+                !query ||
+                u.name.toLowerCase().includes(query) ||
+                (u.email || '').toLowerCase().includes(query) ||
+                (u.phone || '').toLowerCase().includes(query) ||
+                u.role.toLowerCase().includes(query)
+            );
+
+            if (list.length === 0) {
+                grid.innerHTML = `<p class="col-span-full text-xs text-slate-400">Nema pronađenih zaposlenih.</p>`;
+                return;
+            }
+
+            grid.innerHTML = list.map(u => {
+                const roleLabel = u.role === 'admin'
+                    ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-700">Administrator</span>`
+                    : u.role === 'baulajter'
+                        ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-700">Vodja delovišča</span>`
+                        : `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-950 text-indigo-300 border border-indigo-700">Radnik</span>`;
+
+                return `
+                    <div class="bg-slate-900/90 border border-slate-700 rounded-xl p-4 space-y-2.5">
+                        <div class="flex items-start justify-between gap-2">
+                            <div>
+                                <div class="text-sm font-extrabold text-white">${escapeHtml(u.name)}</div>
+                                <div class="mt-1">${roleLabel}</div>
+                            </div>
+                        </div>
+                        <div class="space-y-1 text-xs text-slate-300 pt-1 border-t border-slate-800">
+                            <div class="flex items-center gap-2">
+                                <i class="fa-solid fa-phone text-emerald-400 w-4"></i>
+                                ${u.phone ? `<a href="tel:${escapeHtml(u.phone)}" class="hover:underline text-emerald-300 font-semibold">${escapeHtml(u.phone)}</a>` : `<span class="text-slate-500">-</span>`}
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <i class="fa-solid fa-envelope text-indigo-400 w-4"></i>
+                                ${u.email ? `<a href="mailto:${escapeHtml(u.email)}" class="hover:underline text-indigo-300 break-all">${escapeHtml(u.email)}</a>` : `<span class="text-slate-500">-</span>`}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function setupSignatureCanvas() {
+            const canvas = document.getElementById('signatureCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+
+            const getPos = (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const clientX = e.touches && e.touches.length > 0 ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches && e.touches.length > 0 ? e.touches[0].clientY : e.clientY;
+                return {
+                    x: clientX - rect.left,
+                    y: clientY - rect.top
+                };
+            };
+
+            const startDraw = (e) => {
+                e.preventDefault();
+                isDrawingSig = true;
+                ctx.lineWidth = 2.5;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.strokeStyle = '#0f172a';
+                const pos = getPos(e);
+                ctx.beginPath();
+                ctx.moveTo(pos.x, pos.y);
+            };
+
+            const drawMove = (e) => {
+                if (!isDrawingSig) return;
+                e.preventDefault();
+                const pos = getPos(e);
+                ctx.lineTo(pos.x, pos.y);
+                ctx.stroke();
+                hasDrawnSig = true;
+            };
+
+            const endDraw = () => {
+                if (!isDrawingSig) return;
+                isDrawingSig = false;
+                ctx.closePath();
+            };
+
+            canvas.addEventListener('mousedown', startDraw);
+            canvas.addEventListener('mousemove', drawMove);
+            window.addEventListener('mouseup', endDraw);
+
+            canvas.addEventListener('touchstart', startDraw, { passive: false });
+            canvas.addEventListener('touchmove', drawMove, { passive: false });
+            window.addEventListener('touchend', endDraw);
+        }
+
+        function setupListeners() {
+            const loginForm = document.getElementById('loginForm');
+            if (loginForm) {
+                loginForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const u = document.getElementById('loginUsername').value;
+                    const p = document.getElementById('loginPassword').value;
+                    attemptLogin(u, p);
+                });
+            }
+
+            document.getElementById('chooseKundeLangDeBtn').addEventListener('click', () => {
+                const ctx = pendingKundeSignatureContext;
+                closeKundeLangModal();
+                if (ctx) openSignatureModal(ctx.projectName, ctx.weekKey, 'kunde', ctx.refreshContainerId, 'de');
+            });
+
+            document.getElementById('chooseKundeLangSlBtn').addEventListener('click', () => {
+                const ctx = pendingKundeSignatureContext;
+                closeKundeLangModal();
+                if (ctx) openSignatureModal(ctx.projectName, ctx.weekKey, 'kunde', ctx.refreshContainerId, 'sl');
+            });
+
+            document.getElementById('sigSwitchLangBtn').addEventListener('click', () => {
+                if (!activeSignatureTarget || activeSignatureTarget.signerType !== 'kunde') return;
+                const nextLang = activeSignatureTarget.lang === 'de' ? 'sl' : 'de';
+                renderKundeSignatureLanguageDetails(nextLang);
+            });
+
+            document.getElementById('logoutBtn').addEventListener('click', logoutUser);
+
+            document.getElementById('prevKwBtn').addEventListener('click', () => changeKW(-1));
+            document.getElementById('nextKwBtn').addEventListener('click', () => changeKW(1));
+            document.getElementById('todayKwBtn').addEventListener('click', () => {
+                currentYear = new Date().getFullYear();
+                currentKW = getKW(new Date());
+                updateKWDisplay();
+                renderBaulajterTable();
+            });
+            document.getElementById('downloadPdfBtn').addEventListener('click', downloadBaulajterWeeklyPDF);
+
+            document.getElementById('confirmModalCancelBtn').addEventListener('click', hideConfirmModal);
+            document.getElementById('confirmModalOkBtn').addEventListener('click', () => {
+                if (typeof pendingConfirmCallback === 'function') pendingConfirmCallback();
+                hideConfirmModal();
+            });
+
+            document.getElementById('editCredentialsForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const userId = document.getElementById('editCredUserId').value;
+                const newUsername = document.getElementById('editCredUsername').value.trim();
+                const newPassword = document.getElementById('editCredPassword').value.trim();
+                const newPhone = document.getElementById('editCredPhone').value.trim();
+                const newEmail = document.getElementById('editCredEmail').value.trim();
+
+                if (!newUsername || !newPassword) return;
+                if (appData.users.some(u => u.id !== userId && u.username.toLowerCase() === newUsername.toLowerCase())) {
+                    showToast('To korisničko ime već koristi drugi korisnik.', true);
+                    return;
+                }
+
+                const user = appData.users.find(u => u.id === userId);
+                if (!user) return;
+
+                user.username = newUsername;
+                user.password = newPassword;
+                user.phone = newPhone;
+                user.email = newEmail;
+
+                saveData();
+                closeEditCredentialsModal();
+                renderAdminDatabase();
+                showToast(`Podaci za korisnika ${user.name} su ažurirani.`);
+            });
+
+            document.getElementById('adminAddUserForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const name = document.getElementById('newUserName').value.trim();
+                const username = document.getElementById('newUserUsername').value.trim();
+                const password = document.getElementById('newUserPassword').value.trim();
+                const email = document.getElementById('newUserEmail').value.trim();
+                const phone = document.getElementById('newUserPhone').value.trim();
+                const role = document.getElementById('newUserRole').value;
+
+                if (!name || !username || !password) return;
+                if (appData.users.some(u => u.username.toLowerCase() === username.toLowerCase())) {
+                    showToast('Korisničko ime već postoji.', true);
+                    return;
+                }
+
+                const newId = `u_${Date.now()}`;
+                appData.users.push({ id: newId, name, username, password, role, email, phone });
+                saveData();
+                e.target.reset();
+                renderAdminDatabase();
+                renderAdminMonthlySearch();
+                showToast(`Dodan korisnik: ${name}`);
+            });
+
+            document.getElementById('adminAddSiteForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const location = document.getElementById('newSiteName').value.trim();
+                const company = document.getElementById('newSiteCompany').value.trim();
+                const baulajterId = document.getElementById('newSiteBaulajter').value;
+                const defaultProject = document.getElementById('newSiteDefaultProject').value.trim();
+
+                if (!location || !company) return;
+
+                if (defaultProject && !appData.projects.includes(defaultProject)) {
+                    appData.projects.push(defaultProject);
+                }
+
+                const newSiteId = `site_${Date.now()}`;
+                appData.baustellen.push({
+                    id: newSiteId,
+                    location,
+                    company,
+                    baulajterId,
+                    memberIds: baulajterId ? [baulajterId] : [],
+                    projects: defaultProject ? [defaultProject] : []
+                });
+                selectedAdminSiteId = newSiteId;
+                if (defaultProject) selectedAdminSiteProject = defaultProject;
+
+                saveData();
+                e.target.reset();
+                renderAdminBaustelleView();
+                showToast(`Kreirana baustelle: ${location}`);
+            });
+
+            document.getElementById('adminSearchPersonInput').addEventListener('input', renderAdminMonthlySearch);
+            document.getElementById('adminMonthPicker').addEventListener('change', renderAdminMonthlySearch);
+
+            document.getElementById('bauAddProjectForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const input = document.getElementById('bauNewProjectInput');
+                const val = input.value.trim();
+                if (val && !appData.projects.includes(val)) {
+                    appData.projects.push(val);
+                    const site = getActiveBaulajterSite();
+                    if (site) {
+                        if (!Array.isArray(site.projects)) site.projects = [];
+                        if (!site.projects.includes(val)) site.projects.push(val);
+                    }
+                    saveData();
+                    renderBaulajterProjectsList();
+                    renderBaulajterTable();
+                }
+                input.value = '';
+            });
+
+            document.getElementById('bauSearchListInput').addEventListener('input', renderBaulajterTable);
+            document.getElementById('bauMyMonthPicker').addEventListener('change', (e) => {
+                document.getElementById('bauMyMonthlyContent').innerHTML = buildMonthlyCardHtml(currentUser, e.target.value);
+            });
+            document.getElementById('radnikMonthPicker').addEventListener('change', (e) => {
+                document.getElementById('radnikMonthlyContent').innerHTML = buildMonthlyCardHtml(currentUser, e.target.value);
+            });
+            document.getElementById('directorySearchInput').addEventListener('input', renderDirectory);
+
+            document.getElementById('importBackupInput').addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    try {
+                        const parsed = JSON.parse(ev.target.result);
+                        if (Array.isArray(parsed.users)) {
+                            appData = {
+                                users: parsed.users,
+                                projects: Array.isArray(parsed.projects) ? parsed.projects : [],
+                                timeRecords: parsed.timeRecords || {},
+                                bauLists: parsed.bauLists || {},
+                                projectSignatures: parsed.projectSignatures || {},
+                                baustellen: Array.isArray(parsed.baustellen) ? parsed.baustellen : []
+                            };
+                            saveData();
+                            renderAppForRole();
+                            showToast('Podaci su uspješno učitani iz kopije.');
+                        } else {
+                            showToast('Neispravna backup datoteka.', true);
+                        }
+                    } catch (err) {
+                        showToast('Greška pri čitanju backup datoteke.', true);
+                    }
+                };
+                reader.readAsText(file);
+            });
+        }
+
+        function escapeHtml(str) {
+            return String(str ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+    </script>
+</body>
+</html>
