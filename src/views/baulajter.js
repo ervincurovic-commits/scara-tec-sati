@@ -310,7 +310,8 @@ export async function showMyHours() {
 
 function renderReport() {
   const container = $('bauTabProjects');
-  const projects = activeProjects();
+  const siteProjectIds = new Set(mySites().flatMap((s) => s.projectIds));
+  const projects = activeProjects().filter((p) => siteProjectIds.has(p.id));
   if (!projects.some((p) => p.id === view.reportProjectId)) {
     const current = projectById(view.reportProjectId);
     if (!current) view.reportProjectId = projects[0]?.id || '';

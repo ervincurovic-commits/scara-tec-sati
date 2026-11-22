@@ -87,7 +87,7 @@ ok((await bau.from('bau_lists').upsert({ owner_id: ids.marko, site_id: (await ba
 
 // Signatures and locking
 const png = 'data:image/png;base64,iVBORw0KGgo=';
-ok(!(await bau.from('signatures').upsert({ project_id: project, week_start: monday, user_signature: png, user_signed_by: ids.baulajter, user_signed_name: 'Ervin' })).error, 'leader signs week');
+ok(!(await bau.from('signatures').upsert({ project_id: project, week_start: monday, user_signature: png, user_signed_by: ids.marko, user_signed_name: 'Forged' })).error, 'leader signs week');
 ok((await bau.from('signatures').upsert({ project_id: other, week_start: addDays(monday, 2), user_signature: png })).error, 'signature week must start on Monday');
 ok((await bau.from('signatures').upsert({ project_id: other, week_start: monday, kunde_signature: png })).error, 'client cannot sign before leader');
 ok(!(await bau.from('signatures').update({ kunde_signature: png, kunde_lang: 'de', kunde_signed_at: new Date().toISOString() }).eq('project_id', project).eq('week_start', monday)).error, 'client signs after leader');
@@ -103,6 +103,28 @@ ok(!(await bau.from('signatures').update({ kunde_signature: png, kunde_lang: 'de
   const { error } = await bau.from('signatures').update({ kunde_signature: null }).eq('project_id', project).eq('week_start', monday);
   ok(error && /SIGNED_BY_CLIENT/.test(error.message), 'leader cannot remove client signature');
 }
+
+// Cross-site isolation: a project of another site.
+const adm0 = await as('admin');
+const foreignSite = (await service.from('sites').insert({ location: 'Foreign', company: 'Other' }).select('id').single()).data.id;
+const foreignProject = (await service.from('projects').insert({ name: `Foreign ${Date.now()}` }).select('id').single()).data.id;
+await service.from('site_projects').insert({ site_id: foreignSite, project_id: foreignProject });
+await service.from('signatures').insert({ project_id: foreignProject, week_start: monday, user_signature: png, user_signed_name: 'Other' });
+ok(((await bau.from('signatures').select('*').eq('project_id', foreignProject)).data || []).length === 0, 'leader cannot read other site signatures');
+ok((await bau.from('signatures').upsert({ project_id: foreignProject, week_start: addDays(monday, 7), user_signature: png, kunde_signature: png })).error, 'leader cannot sign other site project');
+{
+  const ownSite = (await bau.from('sites').select('id').limit(1).single()).data.id;
+  ok((await bau.from('site_projects').insert({ site_id: ownSite, project_id: foreignProject })).error, 'leader cannot link other site project');
+  const { data } = await bau.from('projects').update({ archived: true }).eq('id', foreignProject).select();
+  ok(!data || data.length === 0, 'leader cannot archive other site project');
+}
+{
+  const { data } = await service.from('signatures').select('user_signed_by,user_signed_name').eq('project_id', project).eq('week_start', monday).single();
+  ok(data.user_signed_by === ids.baulajter && data.user_signed_name === 'Ervin Ćurović', 'signer recorded by server, not client');
+}
+await service.from('sites').delete().eq('id', foreignSite);
+await service.from('signatures').delete().eq('project_id', foreignProject);
+await service.from('projects').delete().eq('id', foreignProject);
 
 // ---------------------------------------------------------------- admin
 const adm = await as('admin');

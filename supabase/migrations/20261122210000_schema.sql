@@ -132,6 +132,11 @@ language sql stable security definer set search_path = '' as $$
   );
 $$;
 
+create function public.project_linked_elsewhere(pid uuid, sid uuid) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select exists (select 1 from public.site_projects sp where sp.project_id = pid and sp.site_id <> sid);
+$$;
+
 -- ---------------------------------------------------------------- triggers
 
 -- Hours of a project week are frozen once the client has signed it.
@@ -195,6 +200,36 @@ create trigger signatures_guard
   before update or delete on public.signatures
   for each row execute function public.signatures_guard();
 
+-- The leader signature always records who really signed, not what the client sent.
+create function public.signatures_set_signer() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare
+  signer_name text;
+begin
+  if tg_op = 'INSERT' or new.user_signature is distinct from old.user_signature then
+    if new.user_signature is null then
+      new.user_signed_by := null;
+      new.user_signed_name := '';
+      new.user_signed_at := null;
+    else
+      select name into signer_name from public.profiles where id = (select auth.uid());
+      new.user_signed_by := (select auth.uid());
+      new.user_signed_name := coalesce(signer_name, '');
+      new.user_signed_at := now();
+    end if;
+  else
+    new.user_signed_by := old.user_signed_by;
+    new.user_signed_name := old.user_signed_name;
+    new.user_signed_at := old.user_signed_at;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger signatures_set_signer
+  before insert or update on public.signatures
+  for each row execute function public.signatures_set_signer();
+
 -- ---------------------------------------------------------------- row level security
 
 alter table public.profiles      enable row level security;
@@ -231,14 +266,21 @@ create policy projects_select on public.projects for select to authenticated
 create policy projects_insert on public.projects for insert to authenticated
   with check (public.is_admin() or public.is_leader());
 create policy projects_update on public.projects for update to authenticated
-  using (public.is_admin() or public.is_leader())
-  with check (public.is_admin() or public.is_leader());
+  using (public.is_admin() or (public.is_leader() and public.project_on_my_sites(id)))
+  with check (public.is_admin() or (public.is_leader() and public.project_on_my_sites(id)));
 
 -- site_projects
 create policy site_projects_select on public.site_projects for select to authenticated
   using (public.my_role() is not null);
+-- A leader may only link a project that no other site uses yet, so linking
+-- cannot be used to read another site's hours or signatures.
 create policy site_projects_insert on public.site_projects for insert to authenticated
-  with check (public.is_admin() or (public.is_leader() and site_id in (select public.my_site_ids())));
+  with check (
+    public.is_admin()
+    or (public.is_leader()
+        and site_id in (select public.my_site_ids())
+        and not public.project_linked_elsewhere(project_id, site_id))
+  );
 create policy site_projects_delete_admin on public.site_projects for delete to authenticated
   using (public.is_admin());
 
@@ -264,12 +306,12 @@ create policy time_entries_delete on public.time_entries for delete to authentic
 
 -- signatures
 create policy signatures_select on public.signatures for select to authenticated
-  using (public.is_admin() or public.is_leader());
+  using (public.is_admin() or (public.is_leader() and public.project_on_my_sites(project_id)));
 create policy signatures_insert on public.signatures for insert to authenticated
-  with check (public.is_admin() or public.is_leader());
+  with check (public.is_admin() or (public.is_leader() and public.project_on_my_sites(project_id)));
 create policy signatures_update on public.signatures for update to authenticated
-  using (public.is_admin() or public.is_leader())
-  with check (public.is_admin() or public.is_leader());
+  using (public.is_admin() or (public.is_leader() and public.project_on_my_sites(project_id)))
+  with check (public.is_admin() or (public.is_leader() and public.project_on_my_sites(project_id)));
 create policy signatures_delete_admin on public.signatures for delete to authenticated
   using (public.is_admin());
 
@@ -298,3 +340,4 @@ grant execute on function public.is_leader()               to authenticated, ser
 grant execute on function public.my_site_ids()             to authenticated, service_role;
 grant execute on function public.can_manage_user(uuid)     to authenticated, service_role;
 grant execute on function public.project_on_my_sites(uuid) to authenticated, service_role;
+grant execute on function public.project_linked_elsewhere(uuid, uuid) to authenticated, service_role;
