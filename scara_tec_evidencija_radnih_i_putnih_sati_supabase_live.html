@@ -1,0 +1,133 @@
+<!-- ... existing code ... -->
+    <script>
+        const STORAGE_KEY = 'scara_tec_evidencija_pro_v1';
+        const SUPABASE_URL = 'https://pjelwskexxjulhrzolsq.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_gxpu5_zfkFrXKmrZOe9lCA_JnxEOp_l';
+        const SUPABASE_ROW_ID = 'scara_tec_main_state';
+        let isSyncingFromCloud = false;
+        let cloudSaveTimeout = null;
+
+        const daysOfWeek = [
+<!-- ... existing code ... -->
+        function saveData() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+            } catch (err) {
+                console.error('Greška pri čuvanju u localStorage:', err);
+            }
+            if (!isSyncingFromCloud) {
+                clearTimeout(cloudSaveTimeout);
+                cloudSaveTimeout = setTimeout(() => {
+                    pushStateToSupabase();
+                }, 350);
+            }
+        }
+
+        async function pushStateToSupabase() {
+            try {
+                await fetch(`${SUPABASE_URL}/rest/v1/app_state?on_conflict=id`, {
+                    method: 'POST',
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Content-Type': 'application/json',
+                        'Prefer': 'resolution=merge-duplicates,return=minimal'
+                    },
+                    body: JSON.stringify({
+                        id: SUPABASE_ROW_ID,
+                        data: appData,
+                        updated_at: new Date().toISOString()
+                    })
+                });
+            } catch (err) {
+                console.error('Supabase sync write error:', err);
+            }
+        }
+
+        async function pullStateFromSupabase(applyIfChanged = false) {
+            try {
+                const res = await fetch(`${SUPABASE_URL}/rest/v1/app_state?id=eq.${SUPABASE_ROW_ID}&select=data`, {
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                    }
+                });
+                if (!res.ok) return false;
+                const rows = await res.json();
+                if (Array.isArray(rows) && rows.length > 0 && rows[0].data) {
+                    const remoteData = rows[0].data;
+                    const localJson = JSON.stringify(appData);
+                    const remoteJson = JSON.stringify(remoteData);
+                    if (localJson !== remoteJson) {
+                        isSyncingFromCloud = true;
+                        const def = getDefaultData();
+                        appData = {
+                            users: Array.isArray(remoteData.users) && remoteData.users.length ? remoteData.users : def.users,
+                            projects: Array.isArray(remoteData.projects) ? remoteData.projects : def.projects,
+                            baustellen: Array.isArray(remoteData.baustellen) ? remoteData.baustellen : def.baustellen,
+                            bauLists: remoteData.bauLists && typeof remoteData.bauLists === 'object' ? remoteData.bauLists : def.bauLists,
+                            timeRecords: remoteData.timeRecords && typeof remoteData.timeRecords === 'object' ? remoteData.timeRecords : def.timeRecords,
+                            projectSignatures: remoteData.projectSignatures && typeof remoteData.projectSignatures === 'object' ? remoteData.projectSignatures : {}
+                        };
+                        localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+                        isSyncingFromCloud = false;
+                        if (applyIfChanged && currentUser) {
+                            const updatedSelf = appData.users.find(u => u.id === currentUser.id);
+                            if (updatedSelf) currentUser = updatedSelf;
+                            refreshActiveScreenQuietly();
+                        }
+                    }
+                    return true;
+                } else {
+                    await pushStateToSupabase();
+                    return true;
+                }
+            } catch (err) {
+                isSyncingFromCloud = false;
+                console.error('Supabase sync read error:', err);
+                return false;
+            }
+        }
+
+        function refreshActiveScreenQuietly() {
+            const activeEl = document.activeElement;
+            if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'SELECT')) return;
+            if (!document.getElementById('signatureModal')?.classList.contains('hidden')) return;
+            if (!document.getElementById('kundeLangModal')?.classList.contains('hidden')) return;
+
+            if (currentUser.role === 'admin') {
+                if (!document.getElementById('adminTabBaustelle')?.classList.contains('hidden')) {
+                    renderAdminBaustelleView();
+                } else if (!document.getElementById('adminTabDatabase')?.classList.contains('hidden')) {
+                    renderAdminDatabase();
+                }
+            } else if (currentUser.role === 'baulajter') {
+                if (!document.getElementById('bauTabWeekly')?.classList.contains('hidden')) {
+                    renderBaulajterTable();
+                } else if (!document.getElementById('bauTabProjects')?.classList.contains('hidden')) {
+        function openRadnikView() {
+            document.getElementById('directorySection').classList.add('hidden');
+            document.getElementById('kwControlsGroup').classList.add('hidden');
+            document.getElementById('todayKwBtn').classList.add('hidden');
+            document.getElementById('downloadPdfBtn').classList.add('hidden');
+            document.getElementById('bauSiteHeaderSelector').classList.add('hidden');
+            document.getElementById('radnikSection').classList.remove('hidden');
+            setActiveNavButton('navRadnikHours');
+            const mVal = document.getElementById('radnikMonthPicker').value;
+            document.getElementById('radnikMonthlyContent').innerHTML = buildMonthlyCardHtml(currentUser, mVal);
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            loadData();
+            setupListeners();
+            setupSignatureCanvas();
+            await pullStateFromSupabase(false);
+            setInterval(() => {
+                if (document.visibilityState === 'visible') {
+                    pullStateFromSupabase(true);
+                }
+            }, 5000);
+        });
+
+        function renderPdfHtmlToFile(htmlString, filename) {
+<!-- ... existing code ... -->
