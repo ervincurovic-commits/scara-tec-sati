@@ -12,6 +12,7 @@ export const state = {
   bauLists: new Map(), // siteId -> [userId]
   entries: new Map(), // `${userId}|${date}` -> { projectId, workHours, travelHours }
   signatures: new Map(), // `${projectId}|${weekStart}` -> signature row
+  notes: new Map(), // siteId -> [note]
 };
 
 class StoreError extends Error {
@@ -80,6 +81,7 @@ export function resetState() {
   state.bauLists = new Map();
   state.entries = new Map();
   state.signatures = new Map();
+  state.notes = new Map();
 }
 
 export async function getSessionUserId() {
@@ -118,6 +120,14 @@ export const userById = (id) => state.users.find((u) => u.id === id) || null;
 export const projectById = (id) => state.projects.find((p) => p.id === id) || null;
 export const projectName = (id) => projectById(id)?.name || '';
 export const activeProjects = () => state.projects.filter((p) => !p.archived);
+export const siteById = (id) => state.sites.find((s) => s.id === id) || null;
+
+/** Active projects of one site, in the order they were created. */
+export function siteProjectList(siteId) {
+  const site = siteById(siteId);
+  if (!site) return [];
+  return activeProjects().filter((p) => site.projectIds.includes(p.id));
+}
 
 /** Sites the signed in site leader runs or belongs to. */
 export function mySites() {
@@ -263,10 +273,16 @@ export async function clearClientSignature(projectId, weekStart) {
 
 // ---------------------------------------------------------------- projects
 
-/** Returns the id of the project with this name, creating or restoring it. */
-export async function ensureProject(name) {
+/**
+ * Returns the id of this site's project with this name, creating or restoring
+ * it. Projects never move between sites: another site's project with the same
+ * name stays separate.
+ */
+export async function ensureSiteProject(siteId, name) {
   const clean = name.trim();
-  const existing = state.projects.find((p) => p.name === clean);
+  const site = siteById(siteId);
+  if (!site) throw new StoreError('FORBIDDEN');
+  const existing = state.projects.find((p) => p.name === clean && site.projectIds.includes(p.id));
   if (existing) {
     if (existing.archived) {
       check(await supabase.from('projects').update({ archived: false }).eq('id', existing.id));
@@ -276,6 +292,8 @@ export async function ensureProject(name) {
   }
   const row = check(await supabase.from('projects').insert({ name: clean }).select('id,name,archived').single());
   state.projects.push(row);
+  check(await supabase.from('site_projects').insert({ site_id: siteId, project_id: row.id }));
+  site.projectIds.push(row.id);
   return row.id;
 }
 
@@ -285,20 +303,9 @@ export async function archiveProject(projectId) {
   if (p) p.archived = true;
 }
 
-export async function linkSiteProject(siteId, projectId) {
-  check(
-    await supabase
-      .from('site_projects')
-      .upsert({ site_id: siteId, project_id: projectId }, { onConflict: 'site_id,project_id', ignoreDuplicates: true }),
-  );
-  const site = state.sites.find((s) => s.id === siteId);
-  if (site && !site.projectIds.includes(projectId)) site.projectIds.push(projectId);
-}
-
 // ---------------------------------------------------------------- sites
 
 export async function createSite({ location, company, baulajterId, defaultProject }) {
-  const projectId = defaultProject ? await ensureProject(defaultProject) : '';
   const site = check(
     await supabase
       .from('sites')
@@ -309,10 +316,8 @@ export async function createSite({ location, company, baulajterId, defaultProjec
   if (baulajterId) {
     check(await supabase.from('site_members').insert({ site_id: site.id, user_id: baulajterId }));
   }
-  if (projectId) {
-    check(await supabase.from('site_projects').insert({ site_id: site.id, project_id: projectId }));
-  }
   await loadReference();
+  const projectId = defaultProject ? await ensureSiteProject(site.id, defaultProject) : '';
   return { siteId: site.id, projectId };
 }
 
@@ -360,6 +365,52 @@ export async function saveBauList(siteId, memberIds) {
   }
 }
 
+// ---------------------------------------------------------------- notes
+
+const NOTE_COLS = 'id,site_id,author_id,author_name,body,created_at,updated_name,updated_at';
+
+const toNote = (r) => ({
+  id: r.id,
+  siteId: r.site_id,
+  authorId: r.author_id || '',
+  authorName: r.author_name || '',
+  body: r.body,
+  createdAt: r.created_at,
+  updatedName: r.updated_name || '',
+  updatedAt: r.updated_at,
+});
+
+export async function loadNotes(siteId) {
+  const rows = await fetchAll(() =>
+    supabase.from('site_notes').select(NOTE_COLS).eq('site_id', siteId).order('created_at', { ascending: false }).order('id'),
+  );
+  state.notes.set(siteId, rows.map(toNote));
+}
+
+export const getNotes = (siteId) => state.notes.get(siteId) || [];
+
+/** Administrators edit every note, site leaders only their own. */
+export function canEditNote(note) {
+  return state.me?.role === 'admin' || (state.me?.role === 'baulajter' && note.authorId === state.me.id);
+}
+
+export async function addNote(siteId, body) {
+  check(await supabase.from('site_notes').insert({ site_id: siteId, body }));
+  await loadNotes(siteId);
+}
+
+export async function updateNote(note, body) {
+  const rows = check(await supabase.from('site_notes').update({ body }).eq('id', note.id).select('id'));
+  if (!rows.length) throw new StoreError('FORBIDDEN');
+  await loadNotes(note.siteId);
+}
+
+export async function deleteNote(note) {
+  const rows = check(await supabase.from('site_notes').delete().eq('id', note.id).select('id'));
+  if (!rows.length) throw new StoreError('FORBIDDEN');
+  await loadNotes(note.siteId);
+}
+
 // ---------------------------------------------------------------- accounts
 
 export async function setUserRole(userId, role) {
@@ -390,7 +441,7 @@ export async function adminUsers(action, payload) {
 // ---------------------------------------------------------------- backup
 
 export async function exportAll() {
-  const [members, siteProjects, entries, signatures] = await Promise.all([
+  const [members, siteProjects, entries, signatures, notes] = await Promise.all([
     fetchAll(() => supabase.from('site_members').select('site_id,user_id').order('site_id').order('user_id')),
     fetchAll(() => supabase.from('site_projects').select('site_id,project_id').order('site_id').order('project_id')),
     fetchAll(() =>
@@ -401,6 +452,7 @@ export async function exportAll() {
         .order('user_id'),
     ),
     fetchAll(() => supabase.from('signatures').select('*').order('week_start').order('project_id')),
+    fetchAll(() => supabase.from('site_notes').select(NOTE_COLS).order('created_at').order('id')),
   ]);
   const sites = await fetchAll(() => supabase.from('sites').select('id,location,company,baulajter_id').order('created_at').order('id'));
   return {
@@ -414,6 +466,7 @@ export async function exportAll() {
     siteProjects,
     timeEntries: entries,
     signatures,
+    siteNotes: notes,
   };
 }
 
@@ -497,8 +550,13 @@ export async function importAll(backup) {
   }));
   await upsert('signatures', signatures, 'project_id,week_start');
 
+  // Notes keep their text; author and time are stamped by the database.
+  const notes = (Array.isArray(backup.siteNotes) ? backup.siteNotes : []).map((n) => ({ id: n.id, site_id: n.site_id, body: n.body }));
+  await upsert('site_notes', notes, 'id');
+
   state.entries = new Map();
   state.signatures = new Map();
+  state.notes = new Map();
   await loadReference();
   return { skipped: skipped + locked };
 }

@@ -5,9 +5,10 @@ import { onAction, onChange } from '../actions.js';
 import {
   state,
   userById,
-  activeProjects,
+  siteById,
+  siteProjectList,
   projectName,
-  getEntry,
+  getNotes,
   loadEntries,
   loadSignatures,
   getSignature,
@@ -26,9 +27,11 @@ import { USERNAME_RE, MIN_PASSWORD } from '../config.js';
 import { addDays, currentWeekStart, formatHoursHHMM, isoWeek, shiftWeek, todayStr, weekKey } from '../dates.js';
 import { buildMonthlyCardHtml, loadMonth } from './monthly.js';
 import { collectProjectWeek, downloadStundennachweis } from '../pdf.js';
+import { loadSiteNotes, notesPanelHtml } from './notes.js';
 
 const view = {
-  siteId: '',
+  siteId: '', // empty: list of all sites; otherwise the opened site
+  tab: 'hours', // hours | notes | team
   projectId: '',
   weekStart: currentWeekStart(),
   filter: 'all',
@@ -37,12 +40,6 @@ const view = {
 const DAY_HEADS = ['Mon', 'Die', 'Mit', 'Don', 'Fre', 'Sam', 'Son'];
 
 // ---------------------------------------------------------------- sites
-
-function siteProjects(site) {
-  const active = activeProjects();
-  const own = active.filter((p) => site.projectIds.includes(p.id));
-  return [...own, ...active.filter((p) => !site.projectIds.includes(p.id))];
-}
 
 function renderSites() {
   const leaders = state.users.filter((u) => u.role === 'baulajter');
@@ -55,30 +52,29 @@ function renderSites() {
 
   $('adminTotalSitesCount').innerText = state.sites.length;
 
-  const grid = $('adminSitesGrid');
-  if (state.sites.length === 0) {
-    grid.innerHTML = `<div class="col-span-full bg-slate-800 border border-slate-700 rounded-xl p-6 text-center text-xs text-slate-400">${escapeHtml(t('admin.site.none'))}</div>`;
-    $('adminSelectedSitePanel').classList.add('hidden');
+  if (view.siteId && !siteById(view.siteId)) view.siteId = '';
+  const open = Boolean(view.siteId);
+  $('adminSitesOverview').classList.toggle('hidden', open);
+  $('adminSitesGrid').classList.toggle('hidden', open);
+  $('adminSelectedSitePanel').classList.toggle('hidden', !open);
+  if (open) {
+    renderSiteDetails();
     return;
   }
 
-  if (!state.sites.some((s) => s.id === view.siteId)) view.siteId = state.sites[0].id;
+  const grid = $('adminSitesGrid');
+  if (state.sites.length === 0) {
+    grid.innerHTML = `<div class="col-span-full bg-slate-800 border border-slate-700 rounded-xl p-6 text-center text-xs text-slate-400">${escapeHtml(t('admin.site.none'))}</div>`;
+    return;
+  }
 
   grid.innerHTML = state.sites
     .map((site) => {
       const leader = userById(site.baulajterId);
       const members = site.memberIds.map(userById).filter(Boolean);
-      const selected = site.id === view.siteId;
-      const chips = members.length
-        ? members
-            .map((m) => `<span class="text-[12px] px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-slate-200">${escapeHtml(m.name)}</span>`)
-            .join('')
-        : `<span class="text-xs text-slate-500 italic">${escapeHtml(t('admin.site.noMembers'))}</span>`;
-
+      const projects = siteProjectList(site.id);
       return `
-      <div data-action="admin-select-site" data-id="${escapeHtml(site.id)}" class="bg-slate-800 rounded-xl border p-4 shadow-lg flex flex-col justify-between gap-3 cursor-pointer transition ${
-        selected ? 'border-emerald-500 ring-2 ring-emerald-500/30' : 'border-slate-700 hover:border-slate-500'
-      }">
+      <div data-action="admin-select-site" data-id="${escapeHtml(site.id)}" class="bg-slate-800 rounded-xl border border-slate-700 hover:border-emerald-500 p-4 shadow-lg flex flex-col justify-between gap-3 cursor-pointer transition">
         <div class="space-y-2">
           <div class="flex items-start justify-between gap-2">
             <div>
@@ -91,9 +87,9 @@ function renderSites() {
           </div>
           <p class="text-xs text-slate-300"><strong class="text-slate-400">${escapeHtml(t('admin.site.company'))}</strong> ${escapeHtml(site.company)}</p>
           <p class="text-xs text-indigo-300"><strong class="text-slate-400">${escapeHtml(t('role.baulajter'))}:</strong> ${leader ? escapeHtml(leader.name) : escapeHtml(t('admin.site.noLeader'))}</p>
-          <div class="pt-2 border-t border-slate-700/70">
-            <p class="text-[12px] font-semibold text-slate-400 mb-1.5">${escapeHtml(t('admin.site.team', { n: members.length }))}</p>
-            <div class="flex flex-wrap gap-1">${chips}</div>
+          <div class="pt-2 border-t border-slate-700/70 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">
+            <span><i class="fa-solid fa-users mr-1"></i>${escapeHtml(t('admin.site.teamCount', { n: members.length }))}</span>
+            <span><i class="fa-solid fa-folder mr-1"></i>${escapeHtml(t('admin.site.projectCount', { n: projects.length }))}</span>
           </div>
         </div>
         <div class="pt-2 border-t border-slate-700/60 flex items-center justify-between text-xs font-bold text-emerald-400">
@@ -103,94 +99,27 @@ function renderSites() {
       </div>`;
     })
     .join('');
-
-  renderSiteDetails();
 }
 
-function renderSiteDetails() {
-  const panel = $('adminSelectedSitePanel');
-  const site = state.sites.find((s) => s.id === view.siteId);
-  if (!site) {
-    panel.classList.add('hidden');
-    return;
-  }
-  panel.classList.remove('hidden');
-
-  const leaders = state.users.filter((u) => u.role === 'baulajter');
-  const available = state.users.filter((u) => (u.role === 'radnik' || u.role === 'baulajter') && !site.memberIds.includes(u.id));
-  const members = site.memberIds.map(userById).filter(Boolean);
-
-  const projects = siteProjects(site);
+function hoursTabHtml(site) {
+  const projects = siteProjectList(site.id);
   if (!projects.some((p) => p.id === view.projectId)) view.projectId = projects[0]?.id || '';
   const pid = view.projectId;
-  const pname = projectName(pid);
-
   const { week, year } = isoWeek(view.weekStart);
+
+  if (!pid) {
+    return `<p class="text-xs text-slate-400 p-4 bg-slate-900/50 rounded-xl">${escapeHtml(t('admin.site.noProjects'))}</p>`;
+  }
+
+  const pname = projectName(pid);
   const signed = Boolean(getSignature(pid, view.weekStart).kundeSignature);
   const { rows } = collectProjectWeek(pid, view.weekStart);
   const filtered = rows.filter(() => view.filter === 'all' || (view.filter === 'signed' ? signed : !signed));
 
   const filterBtn = (mode, label, on) =>
     `<button type="button" data-action="admin-filter" data-mode="${mode}" class="px-3 py-1.5 rounded-lg font-bold border ${view.filter === mode ? on : 'bg-slate-900 text-slate-300 border-slate-700'}">${label}</button>`;
-  const sid = escapeHtml(site.id);
 
-  panel.innerHTML = `
-    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-700 pb-4">
-      <div>
-        <span class="text-xs font-bold uppercase tracking-wider text-emerald-400">${escapeHtml(t('admin.site.details'))}</span>
-        <h3 class="text-lg font-extrabold text-white">${escapeHtml(site.location)} — <span class="text-slate-300 font-semibold">${escapeHtml(site.company)}</span></h3>
-      </div>
-      <div class="flex flex-wrap items-center gap-2">
-        <button type="button" data-action="admin-site-pdf" data-mode="all" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow flex items-center gap-1.5 transition">
-          <i class="fa-solid fa-file-pdf"></i> ${escapeHtml(t('admin.site.pdfAll'))}
-        </button>
-        <button type="button" data-action="admin-site-pdf" data-mode="signed" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow flex items-center gap-1.5 transition">
-          <i class="fa-solid fa-file-signature"></i> ${escapeHtml(t('report.pdfSigned'))}
-        </button>
-        <button type="button" data-action="admin-site-pdf" data-mode="unsigned" class="bg-amber-600 hover:bg-amber-500 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow flex items-center gap-1.5 transition">
-          <i class="fa-solid fa-clock"></i> ${escapeHtml(t('report.pdfUnsigned'))}
-        </button>
-      </div>
-    </div>
-
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 bg-slate-900/70 p-4 rounded-xl border border-slate-700">
-      <div class="space-y-2.5">
-        <label class="block text-xs font-bold uppercase tracking-wider text-indigo-300">${escapeHtml(t('admin.site.mainLeader'))}</label>
-        <select data-change="admin-site-leader" data-id="${sid}" class="project-select">
-          <option value="">${escapeHtml(t('admin.site.pickLeaderShort'))}</option>
-          ${leaders.map((b) => `<option value="${escapeHtml(b.id)}" ${b.id === site.baulajterId ? 'selected' : ''}>${escapeHtml(b.name)}</option>`).join('')}
-        </select>
-
-        <label class="block text-xs font-bold uppercase tracking-wider text-emerald-300 pt-2">${escapeHtml(t('admin.site.addMember'))}</label>
-        <div class="flex gap-2">
-          <select id="adminAddMemberToSiteSelect" class="project-select">
-            <option value="">${escapeHtml(t('admin.site.pickPerson'))}</option>
-            ${available.map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name)} (${escapeHtml(t(`role.${p.role}`))})</option>`).join('')}
-          </select>
-          <button type="button" data-action="admin-add-member" data-id="${sid}" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-1.5 rounded-lg text-xs font-bold shrink-0">
-            ${escapeHtml(t('common.add'))}
-          </button>
-        </div>
-      </div>
-
-      <div class="space-y-2">
-        <p class="text-xs font-bold uppercase tracking-wider text-slate-400">${escapeHtml(t('admin.site.members', { n: members.length }))}</p>
-        <div class="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
-          ${members
-            .map(
-              (m) => `
-            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-800 border border-slate-600 text-white">
-              <span>${escapeHtml(m.name)} (${m.role === 'baulajter' ? 'VD' : 'R'})</span>
-              <button type="button" data-action="admin-remove-member" data-id="${sid}" data-user="${escapeHtml(m.id)}" class="text-slate-400 hover:text-red-400">
-                <i class="fa-solid fa-xmark"></i>
-              </button>
-            </span>`,
-            )
-            .join('')}
-        </div>
-      </div>
-    </div>
-
+  return `
     <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-slate-900/50 p-3.5 rounded-xl border border-slate-700">
       <div class="flex flex-wrap items-center gap-2.5">
         <span class="text-xs font-bold text-slate-400">${escapeHtml(t('admin.site.project'))}</span>
@@ -217,11 +146,23 @@ function renderSiteDetails() {
         }
       </div>
 
-      <div class="flex flex-wrap items-center gap-1.5 text-xs">
-        ${filterBtn('all', `${escapeHtml(t('admin.site.filterAll'))} (${rows.length})`, 'bg-indigo-600 text-white border-indigo-500')}
-        ${filterBtn('signed', escapeHtml(t('admin.site.filterSigned')), 'bg-emerald-600 text-white border-emerald-500')}
-        ${filterBtn('unsigned', escapeHtml(t('admin.site.filterUnsigned')), 'bg-amber-600 text-white border-amber-500')}
+      <div class="flex flex-wrap items-center gap-2">
+        <button type="button" data-action="admin-site-pdf" data-mode="all" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow flex items-center gap-1.5 transition">
+          <i class="fa-solid fa-file-pdf"></i> ${escapeHtml(t('admin.site.pdfAll'))}
+        </button>
+        <button type="button" data-action="admin-site-pdf" data-mode="signed" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow flex items-center gap-1.5 transition">
+          <i class="fa-solid fa-file-signature"></i> ${escapeHtml(t('report.pdfSigned'))}
+        </button>
+        <button type="button" data-action="admin-site-pdf" data-mode="unsigned" class="bg-amber-600 hover:bg-amber-500 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow flex items-center gap-1.5 transition">
+          <i class="fa-solid fa-clock"></i> ${escapeHtml(t('report.pdfUnsigned'))}
+        </button>
       </div>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-1.5 text-xs">
+      ${filterBtn('all', `${escapeHtml(t('admin.site.filterAll'))} (${rows.length})`, 'bg-indigo-600 text-white border-indigo-500')}
+      ${filterBtn('signed', escapeHtml(t('admin.site.filterSigned')), 'bg-emerald-600 text-white border-emerald-500')}
+      ${filterBtn('unsigned', escapeHtml(t('admin.site.filterUnsigned')), 'bg-amber-600 text-white border-amber-500')}
     </div>
 
     <div class="overflow-x-auto">
@@ -258,7 +199,84 @@ function renderSiteDetails() {
               </tbody>
             </table>`
       }
+    </div>`;
+}
+
+function teamTabHtml(site) {
+  const leaders = state.users.filter((u) => u.role === 'baulajter');
+  const available = state.users.filter((u) => (u.role === 'radnik' || u.role === 'baulajter') && !site.memberIds.includes(u.id));
+  const members = site.memberIds.map(userById).filter(Boolean);
+  const sid = escapeHtml(site.id);
+
+  return `
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 bg-slate-900/70 p-4 rounded-xl border border-slate-700">
+      <div class="space-y-2.5">
+        <label class="block text-xs font-bold uppercase tracking-wider text-indigo-300">${escapeHtml(t('admin.site.mainLeader'))}</label>
+        <select data-change="admin-site-leader" data-id="${sid}" class="project-select">
+          <option value="">${escapeHtml(t('admin.site.pickLeaderShort'))}</option>
+          ${leaders.map((b) => `<option value="${escapeHtml(b.id)}" ${b.id === site.baulajterId ? 'selected' : ''}>${escapeHtml(b.name)}</option>`).join('')}
+        </select>
+
+        <label class="block text-xs font-bold uppercase tracking-wider text-emerald-300 pt-2">${escapeHtml(t('admin.site.addMember'))}</label>
+        <div class="flex gap-2">
+          <select id="adminAddMemberToSiteSelect" class="project-select">
+            <option value="">${escapeHtml(t('admin.site.pickPerson'))}</option>
+            ${available.map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name)} (${escapeHtml(t(`role.${p.role}`))})</option>`).join('')}
+          </select>
+          <button type="button" data-action="admin-add-member" data-id="${sid}" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-1.5 rounded-lg text-xs font-bold shrink-0">
+            ${escapeHtml(t('common.add'))}
+          </button>
+        </div>
+      </div>
+
+      <div class="space-y-2">
+        <p class="text-xs font-bold uppercase tracking-wider text-slate-400">${escapeHtml(t('admin.site.members', { n: members.length }))}</p>
+        <div class="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto">
+          ${members
+            .map(
+              (m) => `
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-800 border border-slate-600 text-white">
+              <span>${escapeHtml(m.name)} (${m.role === 'baulajter' ? 'VD' : 'R'})</span>
+              <button type="button" data-action="admin-remove-member" data-id="${sid}" data-user="${escapeHtml(m.id)}" class="text-slate-400 hover:text-red-400">
+                <i class="fa-solid fa-xmark"></i>
+              </button>
+            </span>`,
+            )
+            .join('')}
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderSiteDetails() {
+  const panel = $('adminSelectedSitePanel');
+  const site = siteById(view.siteId);
+  if (!site) return;
+  const leader = userById(site.baulajterId);
+  const notesCount = getNotes(site.id).length;
+
+  const tabBtn = (tab, icon, label) =>
+    `<button type="button" data-action="admin-site-tab" data-tab="${tab}" class="nav-btn ${view.tab === tab ? 'is-active' : ''}"><i class="fa-solid ${icon}"></i> ${label}</button>`;
+
+  const body = view.tab === 'notes' ? notesPanelHtml(site.id) : view.tab === 'team' ? teamTabHtml(site) : hoursTabHtml(site);
+
+  panel.innerHTML = `
+    <div class="space-y-3 border-b border-slate-700 pb-4">
+      <button type="button" data-action="admin-sites-back" class="text-xs font-bold text-slate-300 hover:text-white flex items-center gap-1.5">
+        <i class="fa-solid fa-arrow-left"></i> ${escapeHtml(t('admin.site.back'))}
+      </button>
+      <div>
+        <span class="text-xs font-bold uppercase tracking-wider text-emerald-400">${escapeHtml(t('admin.site.details'))}</span>
+        <h3 class="text-lg font-extrabold text-white">${escapeHtml(site.location)} — <span class="text-slate-300 font-semibold">${escapeHtml(site.company)}</span></h3>
+        <p class="text-xs text-indigo-300 mt-1"><strong class="text-slate-400">${escapeHtml(t('role.baulajter'))}:</strong> ${leader ? escapeHtml(leader.name) : escapeHtml(t('admin.site.noLeader'))}</p>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        ${tabBtn('hours', 'fa-file-pdf', escapeHtml(t('admin.site.tabHours')))}
+        ${tabBtn('notes', 'fa-note-sticky', `${escapeHtml(t('nav.notes'))}${notesCount ? ` (${notesCount})` : ''}`)}
+        ${tabBtn('team', 'fa-users', escapeHtml(t('admin.site.tabTeam', { n: site.memberIds.length })))}
+      </div>
     </div>
+    ${body}
   `;
 }
 
@@ -272,7 +290,7 @@ async function loadSiteWeek() {
 export async function showSites() {
   renderSites();
   try {
-    await loadSiteWeek();
+    await Promise.all([loadSiteWeek(), view.siteId ? loadSiteNotes(view.siteId, renderSites) : null]);
   } catch (err) {
     showError(err);
   }
@@ -361,9 +379,24 @@ function openEditCredentials(userId) {
 // ---------------------------------------------------------------- wiring
 
 export function initAdmin() {
-  onAction('admin-select-site', (d) => {
+  onAction('admin-select-site', async (d) => {
     view.siteId = d.id;
+    view.tab = 'hours';
+    view.projectId = '';
+    view.filter = 'all';
+    window.scrollTo(0, 0);
+    await showSites();
+  });
+
+  onAction('admin-sites-back', () => {
+    view.siteId = '';
     renderSites();
+    window.scrollTo(0, 0);
+  });
+
+  onAction('admin-site-tab', (d) => {
+    view.tab = d.tab;
+    renderSiteDetails();
   });
 
   onAction('admin-delete-site', (d) => {
@@ -389,9 +422,7 @@ export function initAdmin() {
     const defaultProject = $('newSiteDefaultProject').value.trim();
     if (!location || !company) return;
     try {
-      const { siteId, projectId } = await createSite({ location, company, baulajterId, defaultProject });
-      view.siteId = siteId;
-      if (projectId) view.projectId = projectId;
+      await createSite({ location, company, baulajterId, defaultProject });
       e.target.reset();
       showToast(t('admin.site.created', { name: location }));
     } catch (err) {
@@ -459,9 +490,9 @@ export function initAdmin() {
   });
 
   onAction('admin-site-pdf', async (d) => {
-    const site = state.sites.find((s) => s.id === view.siteId);
+    const site = siteById(view.siteId);
     const pid = view.projectId;
-    if (!site || !pid) {
+    if (!site || !pid || !site.projectIds.includes(pid)) {
       showToast(t('pdf.pickSite'), true);
       return;
     }

@@ -17,14 +17,15 @@ import {
   getSignature,
   isLocked,
   saveBauList,
-  ensureProject,
-  linkSiteProject,
+  ensureSiteProject,
+  siteProjectList,
   archiveProject,
 } from '../store.js';
 import { addDays, currentWeekStart, isoWeek, shiftWeek, todayStr, weekDates, weekKey, fmtDE } from '../dates.js';
 import { buildMonthlyCardHtml, loadMonth } from './monthly.js';
 import { downloadStundennachweis, renderElementToPdf } from '../pdf.js';
 import { openSignatureModal, requestKundeSignature, findSiteForProject } from './signature.js';
+import { loadSiteNotes, notesPanelHtml } from './notes.js';
 
 const view = {
   weekStart: currentWeekStart(),
@@ -99,7 +100,8 @@ function populateAddSelect() {
 
 function renderProjectsList() {
   const container = $('bauProjectsListContainer');
-  const projects = activeProjects();
+  const site = getActiveSite();
+  const projects = site ? siteProjectList(site.id) : [];
   if (projects.length === 0) {
     container.innerHTML = `<span class="text-[12px] text-slate-500 italic">${escapeHtml(t('bau.noProjects'))}</span>`;
     return;
@@ -149,7 +151,8 @@ function renderTable() {
   }
   show('bauEmptyMessage', false);
 
-  const projects = activeProjects();
+  // Only this site's projects can be picked; a day booked elsewhere keeps its project.
+  const projects = site ? siteProjectList(site.id) : [];
   let grandW = 0;
   let grandT = 0;
 
@@ -393,6 +396,31 @@ export async function showMyHours() {
   $('bauMyMonthlyContent').innerHTML = buildMonthlyCardHtml(state.me, picker.value);
 }
 
+// ---------------------------------------------------------------- notes
+
+function renderNotes() {
+  const sites = mySites();
+  const site = getActiveSite();
+  const select = $('bauNotesSiteSelect');
+  select.innerHTML = sites
+    .map((s) => `<option value="${escapeHtml(s.id)}" ${site && s.id === site.id ? 'selected' : ''}>${escapeHtml(s.location)}</option>`)
+    .join('');
+  select.classList.toggle('hidden', sites.length < 2);
+  $('bauNotesContent').innerHTML = notesPanelHtml(site?.id || '');
+}
+
+export async function showNotes() {
+  const site = getActiveSite();
+  if (site) view.activeSiteId = site.id;
+  renderNotes();
+  try {
+    await loadSiteNotes(site?.id || '', renderNotes);
+  } catch (err) {
+    showError(err);
+  }
+  renderNotes();
+}
+
 // ---------------------------------------------------------------- projects and signatures
 
 function renderReport() {
@@ -567,7 +595,12 @@ export function initBaulajter() {
   $('bauActiveSiteSelect').addEventListener('change', (e) => {
     view.activeSiteId = e.target.value;
     populateAddSelect();
+    renderProjectsList();
     renderTable();
+  });
+  onChange('bau-notes-site', async (_d, el) => {
+    view.activeSiteId = el.value;
+    await showNotes();
   });
   $('bauSearchListInput').addEventListener('input', renderTable);
   $('bauMobileList').addEventListener('click', (e) => {
@@ -665,10 +698,13 @@ export function initBaulajter() {
     const val = input.value.trim();
     input.value = '';
     if (!val) return;
+    const site = getActiveSite();
+    if (!site) {
+      showToast(t('bau.noSite'), true);
+      return;
+    }
     try {
-      const projectId = await ensureProject(val);
-      const site = getActiveSite();
-      if (site) await linkSiteProject(site.id, projectId);
+      await ensureSiteProject(site.id, val);
     } catch (err) {
       showError(err);
     }

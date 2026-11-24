@@ -7,7 +7,8 @@ import { REFRESH_MS } from './config.js';
 import { currentMonthStr } from './dates.js';
 import { state, signIn, signOut, loadReference, getSessionUserId, resetState } from './store.js';
 import { initSignature } from './views/signature.js';
-import { initBaulajter, showWeekly, showMyHours, showReport } from './views/baulajter.js';
+import { initBaulajter, showWeekly, showMyHours, showReport, showNotes } from './views/baulajter.js';
+import { initNotes } from './views/notes.js';
 import { initAdmin, showSites, showDatabase } from './views/admin.js';
 import { buildMonthlyCardHtml, loadMonth } from './views/monthly.js';
 import { renderDirectory } from './views/directory.js';
@@ -52,6 +53,7 @@ const NAV = {
     { view: 'bau-weekly', icon: 'fa-calendar-week', label: 'nav.weekly' },
     { view: 'bau-my', icon: 'fa-user-clock', label: 'nav.myHours' },
     { view: 'bau-projects', icon: 'fa-file-signature', label: 'nav.projects' },
+    { view: 'bau-notes', icon: 'fa-note-sticky', label: 'nav.notes' },
     { view: 'directory', icon: 'fa-address-book', label: 'nav.directory' },
   ],
   radnik: [
@@ -116,10 +118,12 @@ async function openView(view) {
     show('bauTabWeekly', view === 'bau-weekly');
     show('bauTabMyHours', view === 'bau-my');
     show('bauTabProjects', view === 'bau-projects');
+    show('bauTabNotes', view === 'bau-notes');
     if (view === 'bau-weekly') {
       ['kwControlsGroup', 'todayKwBtn', 'downloadPdfBtn'].forEach((id) => show(id));
       return showWeekly();
     }
+    if (view === 'bau-notes') return showNotes();
     return view === 'bau-my' ? showMyHours() : showReport();
   }
   show('radnikSection');
@@ -179,6 +183,7 @@ function wire() {
   initSignature();
   initBaulajter();
   initAdmin();
+  initNotes();
 
   onAction('toggle-theme', toggleTheme);
   onAction('set-lang', (d) => {

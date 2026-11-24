@@ -140,7 +140,7 @@
 
                 <!-- Admin Tab 1: Baustelle -->
                 <div id="adminTabBaustelle" class="hidden space-y-6">
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <div id="adminSitesOverview" class="grid grid-cols-1 lg:grid-cols-3 gap-4">
                         <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-lg lg:col-span-2">
                             <h2 class="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-3 flex items-center gap-2">
                                 <i class="fa-solid fa-helmet-safety"></i> <span data-i18n="admin.site.createTitle"></span>
@@ -380,6 +380,17 @@
                 </div>
 
                 <div id="bauTabProjects" class="hidden space-y-6"></div>
+
+                <div id="bauTabNotes" class="hidden space-y-4">
+                    <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                            <h2 class="text-sm font-bold text-white" data-i18n="notes.title"></h2>
+                            <p class="text-xs text-slate-400" data-i18n="notes.hint"></p>
+                        </div>
+                        <select id="bauNotesSiteSelect" data-change="bau-notes-site" class="project-select sm:max-w-xs"></select>
+                    </div>
+                    <div id="bauNotesContent" class="bg-slate-800 p-4 rounded-xl border border-slate-700"></div>
+                </div>
             </section>
 
             <!-- ================= SEKCIJA 3: RADNIK ================= -->

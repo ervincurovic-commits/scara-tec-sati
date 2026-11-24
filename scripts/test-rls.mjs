@@ -159,6 +159,43 @@ ok((await fnCode(await fn(adm, { action: 'delete', id: neuId }))) === 'OK', 'adm
 ok(!(await service.from('profiles').select('id').eq('id', neuId).maybeSingle()).data, 'deleted profile is gone');
 ok((await fnCode(await fn(anon, { action: 'delete', id: ids.marko }))) === 'UNAUTHENTICATED', 'anonymous cannot call account function');
 
+// ---------------------------------------------------------------- site notes
+{
+  const ownSite = (await bau.from('sites').select('id').limit(1).single()).data.id;
+  const far = (await service.from('sites').insert({ location: 'Notes Fremd', company: 'X' }).select('id').single()).data.id;
+
+  const mine = await bau.from('site_notes').insert({ site_id: ownSite, body: 'Kran kommt Montag', author_id: ids.admin, author_name: 'Fake' }).select('id,author_id,author_name').single();
+  ok(!mine.error, 'leader adds note on own site');
+  ok(mine.data?.author_id === ids.baulajter && mine.data?.author_name === 'Ervin Ćurović', 'note author stamped by server');
+  ok((await bau.from('site_notes').insert({ site_id: far, body: 'x' })).error, 'leader cannot add note on other site');
+  ok((await marko.from('site_notes').insert({ site_id: ownSite, body: 'x' })).error, 'worker cannot add notes');
+  ok(((await marko.from('site_notes').select('id')).data || []).length === 0, 'worker cannot read notes');
+
+  const seen = (await adm.from('site_notes').select('id,body').eq('id', mine.data.id)).data || [];
+  ok(seen.length === 1, 'admin reads leader note');
+  const edited = await adm.from('site_notes').update({ body: 'Kran kommt Dienstag' }).eq('id', mine.data.id).select('body,author_id,updated_by').single();
+  ok(edited.data?.body === 'Kran kommt Dienstag' && edited.data.author_id === ids.baulajter && edited.data.updated_by === ids.admin, 'admin edits leader note, author kept');
+
+  const admNote = (await adm.from('site_notes').insert({ site_id: ownSite, body: 'Von Admin' }).select('id').single()).data.id;
+  ok(((await bau.from('site_notes').select('id').eq('id', admNote)).data || []).length === 1, 'leader reads admin note on own site');
+  ok(((await bau.from('site_notes').update({ body: 'hack' }).eq('id', admNote).select()).data || []).length === 0, 'leader cannot edit admin note');
+  ok(((await bau.from('site_notes').delete().eq('id', admNote).select()).data || []).length === 0, 'leader cannot delete admin note');
+  ok(((await bau.from('site_notes').update({ site_id: far }).eq('id', mine.data.id).select('site_id')).data || [])[0]?.site_id === ownSite, 'note cannot move to other site');
+
+  const farNote = (await service.from('site_notes').insert({ site_id: far, body: 'geheim' }).select('id').single()).data.id;
+  ok(((await bau.from('site_notes').select('id').eq('id', farNote)).data || []).length === 0, 'leader cannot read other site notes');
+  ok(((await bau.from('site_notes').delete().eq('id', mine.data.id).select()).data || []).length === 1, 'leader deletes own note');
+
+  // Same project name on two sites stays two separate projects.
+  const p1 = await adm.from('projects').insert({ name: 'Doppelt' }).select('id').single();
+  const p2 = await adm.from('projects').insert({ name: 'Doppelt' }).select('id').single();
+  ok(!p1.error && !p2.error && p1.data.id !== p2.data.id, 'two sites may use the same project name');
+  await service.from('projects').delete().in('id', [p1.data?.id, p2.data?.id].filter(Boolean));
+
+  await service.from('sites').delete().eq('id', far);
+  await service.from('site_notes').delete().eq('site_id', ownSite);
+}
+
 // cleanup
 await service.from('time_entries').delete().eq('work_date', monday);
 await service.from('signatures').delete().eq('week_start', monday);

@@ -43,8 +43,8 @@ for (const p of people) {
 
 const projects = {};
 for (const name of ['1768/25-1800149', 'Objekat Centar', 'Hala A1']) {
-  const row = must(await db.from('projects').upsert({ name }, { onConflict: 'name' }).select('id').single());
-  projects[name] = row.id;
+  const found = must(await db.from('projects').select('id').eq('name', name).limit(1).maybeSingle());
+  projects[name] = found ? found.id : must(await db.from('projects').insert({ name }).select('id').single()).id;
 }
 
 let site = must(await db.from('sites').select('id').eq('location', 'Stuttgart Mercedes Benz').maybeSingle());
